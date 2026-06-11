@@ -1,0 +1,39 @@
+[project]
+name = "code-sandbox-worker"
+version = "1.0.0"
+description = "Worker daemon and sandbox engine for the Code Interpreter Sandbox"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["worker", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+  "E501",   # line length handled by the formatter
+  "B008",   # function calls in defaults are intentional in a few places
+  "UP017",  # keep timezone.utc (datetime.UTC requires 3.11+); we support 3.11 but stay explicit
+  "UP041",  # keep asyncio.TimeoutError explicit (distinct from builtin pre-3.11)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test files legitimately use inline open(), fire-and-forget tasks, and zip() pairs.
+"tests/**" = ["S101", "N802", "N803", "SIM115", "RUF006", "RUF007", "B905"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
+show_error_codes = true
+files = ["worker"]
+exclude = "(^|/)tests/"
+
+[[tool.mypy.overrides]]
+module = ["minio", "minio.*", "prometheus_client", "prometheus_client.*"]
+ignore_missing_imports = true
