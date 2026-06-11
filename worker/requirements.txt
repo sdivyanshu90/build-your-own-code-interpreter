@@ -1,0 +1,5 @@
+# Runtime dependencies for the sandbox worker daemon.
+# Pinned for reproducible, auditable builds (no runtime resolution surprises).
+redis==5.2.1
+minio==7.2.12
+prometheus-client==0.21.1
