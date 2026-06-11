@@ -1,0 +1,110 @@
+name: Security
+
+# Nightly security sweep: image vulnerability scans, dependency audits, and a dynamic API scan.
+on:
+  schedule:
+    - cron: '17 3 * * *' # 03:17 UTC nightly
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
+
+defaults:
+  run:
+    working-directory: code-sandbox
+
+jobs:
+  trivy-images:
+    name: Trivy image scan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: [python, javascript, typescript, java, go, ruby, rust, bash]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the runtime image
+        run: docker build -t sandbox-runtime-${{ matrix.lang }}:latest runtimes/${{ matrix.lang }}
+      - name: Scan with Trivy (fail on HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: sandbox-runtime-${{ matrix.lang }}:latest
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-${{ matrix.lang }}.sarif'
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: code-sandbox/trivy-${{ matrix.lang }}.sarif
+          category: trivy-runtime-${{ matrix.lang }}
+
+  trivy-services:
+    name: Trivy scan API + worker images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: make build-services
+      - name: Scan API + worker
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          ignore-unfixed: true
+          image-ref: code-sandbox-api:latest
+      - name: Scan worker image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          ignore-unfixed: true
+          image-ref: code-sandbox-worker:latest
+
+  dependency-audit:
+    name: Dependency audit (npm + pip)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+        working-directory: code-sandbox/api
+      - name: npm audit (high+)
+        run: npm audit --audit-level=high
+        working-directory: code-sandbox/api
+        continue-on-error: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pip-audit && pip-audit -r worker/requirements.txt
+        continue-on-error: true
+
+  zap-baseline:
+    name: OWASP ZAP baseline (running API)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the API + Redis + MinIO
+        run: |
+          cp .env.example .env
+          docker compose up -d --build api redis minio createbuckets
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/v1/health && break || sleep 2;
+          done
+      - name: ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://localhost:8080/v1/health'
+          fail_action: false
+          cmd_options: '-I'
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
