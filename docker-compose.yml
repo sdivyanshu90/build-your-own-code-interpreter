@@ -1,0 +1,168 @@
+# Local development stack for the Code Interpreter Sandbox.
+#
+#   docker compose up --build            # start everything
+#   docker compose up --scale worker=3   # run three workers
+#
+# The worker talks to the HOST Docker daemon (mounted socket) to launch sibling sandbox
+# containers, and shares a per-job work directory with the host at the SAME path so the
+# read-only code bind-mount resolves correctly on the daemon side.
+name: code-sandbox
+
+x-common-env: &common-env
+  REDIS_URL: redis://redis:6379/0
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
+  MINIO_BUCKET: ${MINIO_BUCKET:-sandbox-artifacts}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  redis:
+    image: redis:7.4.1-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  createbuckets:
+    image: minio/mc:RELEASE.2024-11-05T11-29-45Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minioadmin} ${MINIO_SECRET_KEY:-minioadmin123} &&
+      mc mb --ignore-existing local/${MINIO_BUCKET:-sandbox-artifacts} &&
+      echo 'bucket ready';
+      "
+    restart: "no"
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-env
+      PORT: "8080"
+      NODE_ENV: ${NODE_ENV:-development}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-secret-change-me-32chars!!}
+      ALLOW_ANONYMOUS: ${ALLOW_ANONYMOUS:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      API_KEYS: ${API_KEYS:-}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-env
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      SANDBOX_WORKDIR: /var/sandbox-work
+      # Host path the Docker daemon sees for the code bind-mount; MUST equal the host side of
+      # the volume mount below.
+      SANDBOX_HOST_WORKDIR: ${SANDBOX_HOST_WORKDIR:-/tmp/code-sandbox-work}
+      SANDBOX_IMAGE_TAG: ${SANDBOX_IMAGE_TAG:-latest}
+      METRICS_PORT: "9100"
+    volumes:
+      # Drive sibling sandbox containers via the host daemon.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared per-job code dir at an identical host:container path.
+      - ${SANDBOX_HOST_WORKDIR:-/tmp/code-sandbox-work}:/var/sandbox-work
+      # Read cgroup metrics (best effort; memory/cpu peaks).
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.3.2
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.3.2
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  minio-data:
+  prometheus-data:
+  loki-data:
+  grafana-data:
