@@ -1,0 +1,28 @@
+# Prometheus scrape configuration for the Code Interpreter Sandbox.
+# Uses Docker DNS service discovery so all scaled api/worker replicas are scraped.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: code-sandbox
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: sandbox-api
+    metrics_path: /v1/metrics
+    dns_sd_configs:
+      - names: ["api"]
+        type: A
+        port: 8080
+
+  - job_name: sandbox-worker
+    dns_sd_configs:
+      - names: ["worker"]
+        type: A
+        port: 9100
