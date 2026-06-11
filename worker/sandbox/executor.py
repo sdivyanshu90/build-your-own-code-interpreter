@@ -245,8 +245,13 @@ class SandboxExecutor:
         ]
         cmd += runtime.limits.to_docker_flags()  # memory, swap-off, cpus, pids, tmpfs, ulimits, net
         if runtime.needs_exec_build:
-            # Compiled languages need a writable+executable build dir; /tmp stays noexec.
-            cmd += ["--tmpfs", f"/build:rw,nosuid,nodev,size={runtime.limits.disk_mb}m"]
+            # Compiled languages need a writable+EXECUTABLE build dir for their output binaries.
+            # Docker's --tmpfs defaults to noexec, so `exec` must be set explicitly; /tmp stays
+            # noexec. mode=1777 ensures the non-root `nobody` user can write to it.
+            cmd += [
+                "--tmpfs",
+                f"/build:rw,exec,nosuid,nodev,size={runtime.limits.disk_mb}m,mode=1777",
+            ]
         cmd += [
             "--workdir",
             work_in,

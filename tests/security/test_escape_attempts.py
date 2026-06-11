@@ -131,8 +131,11 @@ ESCAPE_ATTEMPTS = [
     (
         "namespace_read_host",
         "bash",
-        "readlink /proc/1/ns/net 2>/dev/null | grep -qv $(readlink /proc/self/ns/net) "
-        "&& echo ESCAPED || echo same-or-blocked",
+        # PID 1 inside the container is the sandbox init, so it must share the container's network
+        # namespace with the current process. Seeing a DIFFERENT (i.e. host) namespace would be an
+        # escape. Compare the inode links literally (they contain regex metachars like '[' ']').
+        "a=$(readlink /proc/1/ns/net 2>/dev/null); b=$(readlink /proc/self/ns/net 2>/dev/null); "
+        'if [ -n "$a" ] && [ "$a" != "$b" ]; then echo ESCAPED; else echo same-or-blocked; fi',
     ),
     (
         "cgroup_release_agent",

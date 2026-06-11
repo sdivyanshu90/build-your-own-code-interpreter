@@ -70,7 +70,7 @@ def _build() -> dict[str, RuntimeConfig]:
             "id": "javascript",
             "name": "JavaScript (Node.js)",
             "version": "20",
-            "entrypoint": ["node", "--disallow-code-generation-from-strings=false"],
+            "entrypoint": ["node"],
             "source_filename": "main.js",
             "needs_exec_build": False,
         },

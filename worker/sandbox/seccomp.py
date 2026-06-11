@@ -6,8 +6,9 @@ Generates Docker-compatible seccomp JSON profiles with a **default-deny** postur
 
 Three layers of safety:
 
-1. A curated ``COMMON_SYSCALLS`` allow-list for interpreted/compiled runtimes, plus per-language
-   extras, and a far smaller ``BASH_SYSCALLS`` list so the shell profile is the most restrictive.
+1. A curated ``COMMON_SYSCALLS`` allow-list shared by the interpreted runtimes, plus per-language
+   extras. Toolchain-heavy runtimes (typescript/go/rust) instead use a default-ALLOW profile that
+   denies the dangerous syscalls (see ``BLOCKLIST_LANGUAGES`` / ``_build_blocklist_profile``).
 2. ``DANGEROUS_SYSCALLS`` — escape/privilege primitives that are *subtracted* from every profile
    defensively, so they can never be allow-listed even by mistake.
 3. ``clone`` is allowed only with a masked-argument rule that forbids the namespace-creation
@@ -31,8 +32,27 @@ from typing import Any, Final
 # A clone() whose flags AND this mask is non-zero is denied (it would create a namespace).
 _CLONE_NAMESPACE_MASK: Final[int] = 0x7E020000  # 2114060288
 
+# Individual CLONE_NEW* flags, used to deny namespace-creating clone() under the blocklist model
+# (where the default is ALLOW, so each flag needs its own deny rule: (arg0 & FLAG) == FLAG).
+_CLONE_NAMESPACE_FLAGS: Final[tuple[int, ...]] = (
+    0x00020000,  # CLONE_NEWNS
+    0x02000000,  # CLONE_NEWCGROUP
+    0x04000000,  # CLONE_NEWUTS
+    0x08000000,  # CLONE_NEWIPC
+    0x10000000,  # CLONE_NEWUSER
+    0x20000000,  # CLONE_NEWPID
+    0x40000000,  # CLONE_NEWNET
+)
+
 # ENOSYS, returned for clone3 so libc falls back to the masked clone().
 _ENOSYS: Final[int] = 38
+
+# Languages whose toolchains (a transpiler/loader or a compiler that spawns a linker and many
+# helper processes/threads) need a syscall surface too broad to safely enumerate as an allow-list.
+# These use a default-ALLOW profile that still denies every DANGEROUS_SYSCALLS entry and blocks
+# namespace-creating clone()/clone3() — the same model as Docker's vetted default profile, paired
+# with this project's stricter cap-drop, no-network, read-only, and no-new-privileges layers.
+BLOCKLIST_LANGUAGES: Final[frozenset[str]] = frozenset({"typescript", "go", "rust"})
 
 ARCHITECTURES: Final[list[str]] = [
     "SCMP_ARCH_X86_64",
@@ -389,92 +409,6 @@ LANGUAGE_EXTRA: Final[dict[str, frozenset[str]]] = {
     "rust": frozenset(),
 }
 
-# A deliberately minimal allow-list for Bash — the most restrictive profile of all.
-BASH_SYSCALLS: Final[frozenset[str]] = frozenset(
-    {
-        "read",
-        "write",
-        "open",
-        "openat",
-        "close",
-        "lseek",
-        "fcntl",
-        "dup",
-        "dup2",
-        "dup3",
-        "pipe",
-        "pipe2",
-        "getdents64",
-        "getcwd",
-        "chdir",
-        "access",
-        "faccessat",
-        "faccessat2",
-        "stat",
-        "fstat",
-        "lstat",
-        "newfstatat",
-        "statx",
-        "readlink",
-        "readlinkat",
-        "umask",
-        "brk",
-        "mmap",
-        "munmap",
-        "mprotect",
-        "mremap",
-        "madvise",
-        "rt_sigaction",
-        "rt_sigprocmask",
-        "rt_sigreturn",
-        "rt_sigsuspend",
-        "sigaltstack",
-        "kill",
-        "tgkill",
-        "ioctl",
-        "fork",
-        "vfork",
-        "execve",
-        "execveat",
-        "wait4",
-        "waitid",
-        "exit",
-        "exit_group",
-        "getpid",
-        "getppid",
-        "getuid",
-        "geteuid",
-        "getgid",
-        "getegid",
-        "getpgrp",
-        "setpgid",
-        "getpgid",
-        "getsid",
-        "setsid",
-        "arch_prctl",
-        "prctl",
-        "set_tid_address",
-        "set_robust_list",
-        "rt_sigtimedwait",
-        "prlimit64",
-        "getrlimit",
-        "uname",
-        "sysinfo",
-        "nanosleep",
-        "clock_gettime",
-        "gettimeofday",
-        "times",
-        "poll",
-        "ppoll",
-        "select",
-        "futex",
-        "getrandom",
-        "fadvise64",
-        "fchmod",
-        "fchown",
-    }
-)
-
 # Network syscalls, added only when a runtime is granted egress (default: not added).
 NETWORK_SYSCALLS: Final[frozenset[str]] = frozenset(
     {
@@ -505,11 +439,14 @@ _ALWAYS_LOCAL: Final[frozenset[str]] = frozenset({"socketpair"})
 
 
 def allowed_syscalls(language: str, network_enabled: bool = False) -> frozenset[str]:
-    """Compute the final allow-list for a language (excluding the specially-handled clone)."""
-    if language == "bash":
-        allowed = set(BASH_SYSCALLS)
-    else:
-        allowed = set(COMMON_SYSCALLS) | set(LANGUAGE_EXTRA.get(language, frozenset()))
+    """Compute the final default-deny allow-list for an interpreted language.
+
+    All interpreted runtimes (python/javascript/java/ruby/bash) share the curated
+    ``COMMON_SYSCALLS`` base plus any per-language extras. The base is deliberately broad enough to
+    satisfy the container runtime's init (e.g. ``capget``/``fstatfs``) and a real shell/interpreter
+    startup, while still being default-deny and excluding the network and dangerous syscalls.
+    """
+    allowed = set(COMMON_SYSCALLS) | set(LANGUAGE_EXTRA.get(language, frozenset()))
     allowed |= _ALWAYS_LOCAL
     if network_enabled:
         allowed |= NETWORK_SYSCALLS
@@ -518,8 +455,8 @@ def allowed_syscalls(language: str, network_enabled: bool = False) -> frozenset[
     return frozenset(allowed)
 
 
-def build_profile(language: str, network_enabled: bool = False) -> dict[str, Any]:
-    """Build a complete Docker seccomp profile dict for a language."""
+def _build_allowlist_profile(language: str, network_enabled: bool) -> dict[str, Any]:
+    """Default-DENY profile: only the per-language allow-list runs (interpreted runtimes)."""
     allowed = allowed_syscalls(language, network_enabled)
     syscalls: list[dict[str, Any]] = [
         {"names": sorted(allowed), "action": "SCMP_ACT_ALLOW"},
@@ -545,6 +482,48 @@ def build_profile(language: str, network_enabled: bool = False) -> dict[str, Any
         "architectures": ARCHITECTURES,
         "syscalls": syscalls,
     }
+
+
+def _build_blocklist_profile() -> dict[str, Any]:
+    """Default-ALLOW profile that denies every dangerous syscall and namespace-creating clone.
+
+    Used for toolchain-heavy runtimes (see :data:`BLOCKLIST_LANGUAGES`). It mirrors the model of
+    Docker's vetted default profile: the broad set of ordinary syscalls a compiler/linker needs is
+    permitted, while the escape/privilege primitives in :data:`DANGEROUS_SYSCALLS` are blocked with
+    ``EPERM``, ``clone3`` is forced to fall back via ``ENOSYS``, and ``clone`` with any CLONE_NEW*
+    flag is denied so no new namespace can be created.
+    """
+    syscalls: list[dict[str, Any]] = [
+        {"names": sorted(DANGEROUS_SYSCALLS), "action": "SCMP_ACT_ERRNO", "errnoRet": 1},
+        {"names": ["clone3"], "action": "SCMP_ACT_ERRNO", "errnoRet": _ENOSYS},
+    ]
+    # One deny rule per namespace flag: deny clone when (arg0 & FLAG) == FLAG (the flag is set).
+    for flag in _CLONE_NAMESPACE_FLAGS:
+        syscalls.append(
+            {
+                "names": ["clone"],
+                "action": "SCMP_ACT_ERRNO",
+                "errnoRet": 1,
+                "args": [{"index": 0, "value": flag, "valueTwo": flag, "op": "SCMP_CMP_MASKED_EQ"}],
+            }
+        )
+    return {
+        "defaultAction": "SCMP_ACT_ALLOW",
+        "architectures": ARCHITECTURES,
+        "syscalls": syscalls,
+    }
+
+
+def build_profile(language: str, network_enabled: bool = False) -> dict[str, Any]:
+    """Build a complete Docker seccomp profile dict for a language.
+
+    Interpreted runtimes get a tight default-deny allow-list; toolchain-heavy runtimes
+    (:data:`BLOCKLIST_LANGUAGES`) get a default-allow profile that still blocks every dangerous
+    syscall and namespace creation.
+    """
+    if language in BLOCKLIST_LANGUAGES:
+        return _build_blocklist_profile()
+    return _build_allowlist_profile(language, network_enabled)
 
 
 @functools.lru_cache(maxsize=32)
