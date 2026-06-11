@@ -1,0 +1,50 @@
+# Prometheus alerting rules — SLO and saturation signals for the sandbox.
+groups:
+  - name: sandbox-slo
+    rules:
+      - alert: HighExecutionFailureRate
+        expr: |
+          sum(rate(sandbox_executions_total{status="FAILED"}[5m]))
+            / clamp_min(sum(rate(sandbox_executions_total[5m])), 0.001) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sandbox failure rate above 10% (5m)."
+          description: "More than 10% of executions are FAILED — check Docker daemon and images."
+
+      - alert: QueueBacklogGrowing
+        expr: sandbox_queue_depth > 200
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job queue backlog over 200."
+          description: "Workers are not keeping up — scale `worker` or investigate slow jobs."
+
+      - alert: OOMKillStorm
+        expr: sum(rate(sandbox_oom_kills_total[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated OOM kills."
+          description: "A pattern of memory-bomb jobs or a too-tight limit; inspect by language."
+
+      - alert: SlowContainerStartup
+        expr: histogram_quantile(0.95, sum(rate(sandbox_container_startup_seconds_bucket[5m])) by (le)) > 2
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "p95 container startup over 2s."
+          description: "Pre-pull runtime images / enable a warm pool to cut cold-start latency."
+
+      - alert: WorkerDown
+        expr: up{job="sandbox-worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A sandbox worker is down."
+          description: "Stale jobs will be reclaimed after the idle timeout; restore the worker."
