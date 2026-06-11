@@ -14,10 +14,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-defaults:
-  run:
-    working-directory: code-sandbox
-
 jobs:
   lint-api:
     name: Lint & type-check (API)
@@ -28,13 +24,13 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: code-sandbox/api/package-lock.json
+          cache-dependency-path: api/package-lock.json
       - run: npm install --no-audit --no-fund
-        working-directory: code-sandbox/api
+        working-directory: api
       - run: npm run lint
-        working-directory: code-sandbox/api
+        working-directory: api
       - run: npm run typecheck
-        working-directory: code-sandbox/api
+        working-directory: api
 
   lint-worker:
     name: Lint & type-check (worker)
@@ -58,17 +54,17 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: code-sandbox/api/package-lock.json
+          cache-dependency-path: api/package-lock.json
       - run: npm install --no-audit --no-fund
-        working-directory: code-sandbox/api
+        working-directory: api
       - name: Vitest with coverage gate (>=90% line / >=85% branch)
         run: npm run test:coverage
-        working-directory: code-sandbox/api
+        working-directory: api
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: api-coverage
-          path: code-sandbox/api/coverage/
+          path: api/coverage/
 
   test-worker:
     name: Unit tests (worker)
@@ -88,7 +84,7 @@ jobs:
         if: always()
         with:
           name: worker-coverage
-          path: code-sandbox/coverage.xml
+          path: coverage.xml
 
   build-images:
     name: Build Docker images

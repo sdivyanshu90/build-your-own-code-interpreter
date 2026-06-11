@@ -46,7 +46,7 @@ class QueueMessage:
 class QueueConsumer:
     """Thin wrapper over Redis Streams for the worker's consumer group."""
 
-    redis: aioredis.Redis[Any]
+    redis: aioredis.Redis
     consumer_name: str
     stream: str = constants.JOB_STREAM
     group: str = constants.CONSUMER_GROUP
@@ -97,7 +97,7 @@ class QueueConsumer:
         for entry in pending:
             msg_id = str(entry["message_id"])
             deliveries = int(entry["times_delivered"])
-            result = await self.redis.xclaim(  # type: ignore[no-untyped-call]
+            result = await self.redis.xclaim(
                 self.stream, self.group, self.consumer_name, min_idle_ms, [msg_id]
             )
             for claimed_id, fields in result:
@@ -106,7 +106,7 @@ class QueueConsumer:
 
     async def ack(self, msg_id: str) -> None:
         """Acknowledge an entry (after its result is durably stored)."""
-        await self.redis.xack(self.stream, self.group, msg_id)  # type: ignore[no-untyped-call]
+        await self.redis.xack(self.stream, self.group, msg_id)
 
     async def dead_letter(self, message: QueueMessage, reason: str) -> None:
         """Move an entry to the dead-letter stream and ack it off the main stream."""

@@ -34,7 +34,7 @@ def _now_iso() -> str:
 class ResultStore:
     """Persists job records and execution results across Redis and MinIO."""
 
-    def __init__(self, redis: aioredis.Redis[Any], minio_client: Any | None, bucket: str) -> None:
+    def __init__(self, redis: aioredis.Redis, minio_client: Any | None, bucket: str) -> None:
         self._redis = redis
         self._minio = minio_client
         self._bucket = bucket

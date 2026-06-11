@@ -8,7 +8,6 @@ shapes mirror the ``StreamMessage`` union in api/src/types/index.ts exactly.
 from __future__ import annotations
 
 import json
-from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -19,7 +18,7 @@ from worker.sandbox.types import ExecutionResult
 class StreamPublisher:
     """Publishes live execution events to a job's Pub/Sub channel."""
 
-    def __init__(self, redis: aioredis.Redis[Any]) -> None:
+    def __init__(self, redis: aioredis.Redis) -> None:
         self._redis = redis
 
     async def _publish(self, job_id: str, message: dict[str, object]) -> None:

@@ -14,10 +14,6 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
 
-defaults:
-  run:
-    working-directory: code-sandbox
-
 jobs:
   build-and-push:
     name: Build & push images
@@ -57,7 +53,7 @@ jobs:
         with:
           node-version: '20'
       - run: npm install --no-audit --no-fund
-        working-directory: code-sandbox/api
+        working-directory: api
       - name: Bring up the full stack
         run: |
           cp .env.example .env
@@ -69,7 +65,7 @@ jobs:
           done
       - name: Run the e2e suite
         run: npx vitest run --config ../tests/e2e/vitest.e2e.config.ts
-        working-directory: code-sandbox/api
+        working-directory: api
         env:
           API_BASE_URL: http://localhost:8080
       - name: Tear down
@@ -94,7 +90,6 @@ jobs:
           else
             git log --pretty='- %s (%h)' >> CHANGELOG_RELEASE.md
           fi
-        working-directory: .
       - name: Create the release
         uses: softprops/action-gh-release@v2
         with:

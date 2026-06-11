@@ -12,7 +12,6 @@ import asyncio
 import contextlib
 import random
 import signal
-from typing import Any
 
 import redis.asyncio as aioredis
 from minio import Minio
@@ -39,7 +38,9 @@ class WorkerDaemon:
     def __init__(self, config: WorkerConfig) -> None:
         self.config = config
         self.logger = configure_logging(config.log_level)
-        self.redis: aioredis.Redis[Any] = aioredis.from_url(config.redis_url, decode_responses=True)
+        self.redis: aioredis.Redis = aioredis.from_url(  # type: ignore[no-untyped-call]
+            config.redis_url, decode_responses=True
+        )
         self.consumer = QueueConsumer(self.redis, consumer_name=config.worker_id)
         self.publisher = StreamPublisher(self.redis)
         self.store = ResultStore(self.redis, _build_minio(config), config.minio_bucket)
@@ -65,7 +66,7 @@ class WorkerDaemon:
             with contextlib.suppress(Exception):
                 reaper_task.cancel()
                 await reaper_task
-            await self.redis.aclose()  # type: ignore[attr-defined]
+            await self.redis.aclose()
             self.logger.info("worker stopped", extra={"worker_id": self.config.worker_id})
 
     def request_stop(self) -> None:
