@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build output
+api/dist/
+*.tsbuildinfo
+
+# Test / coverage artifacts
+coverage/
+htmlcov/
+.coverage
+coverage.xml
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+load-test-summary.json
+
+# Local config & secrets
+.env
+*.local
+
+# Runtime scratch
+/tmp/code-sandbox-work/
+/tmp/sandbox-seccomp/
