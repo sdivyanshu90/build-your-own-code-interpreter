@@ -1,0 +1,812 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [
+    "code-sandbox",
+    "execution",
+    "security"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "name": "DS_PROM",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 0
+      },
+      {
+        "current": {
+          "text": "Loki",
+          "value": "loki"
+        },
+        "name": "DS_LOKI",
+        "label": "Loki",
+        "type": "datasource",
+        "query": "loki",
+        "hide": 0
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Code Interpreter Sandbox \u2014 Overview",
+  "uid": "sandbox-overview",
+  "version": 1,
+  "weekStart": "",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Jobs in flight",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "sum(sandbox_jobs_in_flight)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Queue depth",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 200
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "max(sandbox_queue_depth)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Exec rate (1m)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "sum(rate(sandbox_executions_total[1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Failure ratio (5m)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.05
+              },
+              {
+                "color": "red",
+                "value": 0.1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "sum(rate(sandbox_executions_total{status=\"FAILED\"}[5m])) / clamp_min(sum(rate(sandbox_executions_total[5m])),0.001)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "OOM kills (5m)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "sum(increase(sandbox_oom_kills_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Timeout kills (5m)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "sum(increase(sandbox_timeout_kills_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Executions by status",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "sum by (status) (rate(sandbox_executions_total[1m]))",
+          "legendFormat": "{{status}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Executions by language",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "sum by (language) (rate(sandbox_executions_total[1m]))",
+          "legendFormat": "{{language}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Execution duration (quantiles)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "histogram_quantile(0.50, sum(rate(sandbox_execution_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(sandbox_execution_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "histogram_quantile(0.99, sum(rate(sandbox_execution_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Container startup (quantiles)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "histogram_quantile(0.50, sum(rate(sandbox_container_startup_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(sandbox_container_startup_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "API request rate by code",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "sum by (code) (rate(sandbox_api_http_requests_total[1m]))",
+          "legendFormat": "{{code}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "API latency p95 / rate-limited",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROM}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(sandbox_api_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95 latency (s)",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROM}"
+          },
+          "expr": "sum(rate(sandbox_api_rate_limited_total[1m]))",
+          "legendFormat": "rate-limited/s",
+          "refId": "B",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Recent logs (api + worker)",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "expr": "{service=~\"api|worker\"} | json",
+          "refId": "A",
+          "queryType": "range"
+        }
+      ]
+    }
+  ]
+}
