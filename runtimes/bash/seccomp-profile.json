@@ -1,0 +1,120 @@
+{
+  "architectures": [
+    "SCMP_ARCH_X86_64",
+    "SCMP_ARCH_X86",
+    "SCMP_ARCH_X32",
+    "SCMP_ARCH_AARCH64",
+    "SCMP_ARCH_ARM"
+  ],
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "defaultErrnoRet": 1,
+  "syscalls": [
+    {
+      "action": "SCMP_ACT_ALLOW",
+      "names": [
+        "access",
+        "arch_prctl",
+        "brk",
+        "chdir",
+        "clock_gettime",
+        "close",
+        "dup",
+        "dup2",
+        "dup3",
+        "execve",
+        "execveat",
+        "exit",
+        "exit_group",
+        "faccessat",
+        "faccessat2",
+        "fadvise64",
+        "fchmod",
+        "fchown",
+        "fcntl",
+        "fork",
+        "fstat",
+        "futex",
+        "getcwd",
+        "getdents64",
+        "getegid",
+        "geteuid",
+        "getgid",
+        "getpgid",
+        "getpgrp",
+        "getpid",
+        "getppid",
+        "getrandom",
+        "getrlimit",
+        "getsid",
+        "gettimeofday",
+        "getuid",
+        "ioctl",
+        "kill",
+        "lseek",
+        "lstat",
+        "madvise",
+        "mmap",
+        "mprotect",
+        "mremap",
+        "munmap",
+        "nanosleep",
+        "newfstatat",
+        "open",
+        "openat",
+        "pipe",
+        "pipe2",
+        "poll",
+        "ppoll",
+        "prctl",
+        "prlimit64",
+        "read",
+        "readlink",
+        "readlinkat",
+        "rt_sigaction",
+        "rt_sigprocmask",
+        "rt_sigreturn",
+        "rt_sigsuspend",
+        "rt_sigtimedwait",
+        "select",
+        "set_robust_list",
+        "set_tid_address",
+        "setpgid",
+        "setsid",
+        "sigaltstack",
+        "socketpair",
+        "stat",
+        "statx",
+        "sysinfo",
+        "tgkill",
+        "times",
+        "umask",
+        "uname",
+        "vfork",
+        "wait4",
+        "waitid",
+        "write"
+      ]
+    },
+    {
+      "action": "SCMP_ACT_ALLOW",
+      "args": [
+        {
+          "index": 0,
+          "op": "SCMP_CMP_MASKED_EQ",
+          "value": 2114060288,
+          "valueTwo": 0
+        }
+      ],
+      "names": [
+        "clone"
+      ]
+    },
+    {
+      "action": "SCMP_ACT_ERRNO",
+      "errnoRet": 38,
+      "names": [
+        "clone3"
+      ]
+    }
+  ]
+}
