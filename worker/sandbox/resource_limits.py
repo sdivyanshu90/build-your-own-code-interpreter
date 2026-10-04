@@ -58,7 +58,7 @@ class ResourceConfig:
             "nofile=256:256",
             "--ulimit",
             f"nproc={self.pids_limit}:{self.pids_limit}",
-            # Cap single-file size (blocks/units of 1024 bytes) to bound disk writes.
+            # Cap single-file size (RLIMIT_FSIZE is in bytes) to bound disk writes.
             "--ulimit",
             f"fsize={self.disk_mb * 1024 * 1024}",
         ]

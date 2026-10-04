@@ -42,6 +42,9 @@ OutputCallback = Callable[[str, str], Awaitable[None]]
 # this means the cgroup OOM killer fired.
 _SIGKILL_EXIT = 137
 
+# Upper bound on waiting for `docker run` to exit after SIGKILL before force-removing it.
+_KILL_WAIT_SECONDS = 5
+
 # How often the resource sampler reads cgroup files, in seconds.
 _SAMPLE_INTERVAL = 0.05
 
@@ -127,6 +130,7 @@ class SandboxExecutor:
         memory_reader: ReaderFn | None = None,
         cpu_reader: ReaderFn | None = None,
         clock: Callable[[], float] = time.monotonic,
+        startup_observer: Callable[[float], None] | None = None,
     ) -> None:
         self.config = config
         self._spawn: SpawnFn = spawn or self._default_spawn
@@ -134,6 +138,8 @@ class SandboxExecutor:
         self._memory_reader: ReaderFn = memory_reader or self._default_memory_reader
         self._cpu_reader: ReaderFn = cpu_reader or self._default_cpu_reader
         self._clock = clock
+        # Called once per job with seconds from `docker run` spawn until the container exists.
+        self._startup_observer = startup_observer
         self._cid_cache: dict[str, str] = {}
 
     # ── public API ──────────────────────────────────────────────────────────────────────
@@ -293,7 +299,7 @@ class SandboxExecutor:
             self._pump(proc.stdout, "stdout", capture, on_output),
             self._pump(proc.stderr, "stderr", capture, on_output),
         )
-        sampler = asyncio.create_task(self._sample(container, sample))
+        sampler = asyncio.create_task(self._sample(container, sample, start))
 
         outcome = await self._await_completion(proc, container, timeout, cancel_event)
 
@@ -341,7 +347,16 @@ class SandboxExecutor:
             await asyncio.wait_for(proc.wait(), self.config.sigterm_grace_seconds)
         except asyncio.TimeoutError:
             await self._simple([self.config.docker_path, "kill", "--signal=KILL", container])
-            await proc.wait()
+            try:
+                await asyncio.wait_for(proc.wait(), _KILL_WAIT_SECONDS)
+            except asyncio.TimeoutError:
+                # `docker kill` can fail if the container was not created yet (a very short
+                # timeout racing container creation). Never wait unboundedly: force-remove the
+                # container and kill the local `docker run` client so the job slot is freed.
+                await self._simple([self.config.docker_path, "rm", "-f", container])
+                with contextlib.suppress(ProcessLookupError):
+                    proc.kill()
+                await proc.wait()
 
     @staticmethod
     async def _feed_stdin(proc: asyncio.subprocess.Process, data: bytes) -> None:
@@ -410,10 +425,15 @@ class SandboxExecutor:
         )
 
     # ── resource sampling ───────────────────────────────────────────────────────────────
-    async def _sample(self, container: str, sample: _Sample) -> None:
+    async def _sample(self, container: str, sample: _Sample, spawned_at: float) -> None:
         """Poll cgroup memory/cpu while the container runs, tracking the peak."""
+        observed = self._startup_observer is None
         try:
             while True:
+                if not observed and await self._resolve_cid(container):
+                    observed = True
+                    assert self._startup_observer is not None
+                    self._startup_observer(self._clock() - spawned_at)
                 mem = await self._memory_reader(container)
                 if mem > sample.peak_bytes:
                     sample.peak_bytes = mem

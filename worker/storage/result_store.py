@@ -75,6 +75,19 @@ class ResultStore:
         await self._redis.set(constants.job_record_key(job_id), json.dumps(record), keepttl=True)
         return record
 
+    async def release_slot(self, user_id: str, job_id: str) -> None:
+        """Release the API's per-user concurrency slot for a finished job (best effort).
+
+        The API grants the slot at submit time and only releases it itself for synchronous
+        requests and cancellations; async jobs would otherwise hold it until the slot's TTL.
+        """
+        if not user_id:
+            return
+        try:
+            await self._redis.zrem(constants.concurrency_key(user_id), job_id)
+        except Exception as exc:  # pragma: no cover - slot self-expires
+            logger.warning("slot release failed", extra={"job_id": job_id, "err": str(exc)})
+
     async def set_running(self, job_id: str, worker_id: str) -> None:
         """Transition a job to RUNNING and stamp the owning worker."""
         await self.patch_record(job_id, status=constants.STATUS_RUNNING, worker_id=worker_id)

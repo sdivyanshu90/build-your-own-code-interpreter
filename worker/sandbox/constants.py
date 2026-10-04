@@ -49,3 +49,8 @@ def stream_channel(job_id: str) -> str:
 def cancel_key(job_id: str) -> str:
     """Key set by the API when a job is cancelled."""
     return f"sandbox:cancel:{job_id}"
+
+
+def concurrency_key(user_id: str) -> str:
+    """Sorted set of a user's in-flight job ids (the API's per-user concurrency quota)."""
+    return f"sandbox:concurrency:{user_id}"
