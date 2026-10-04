@@ -271,10 +271,60 @@ async def cmd_timeout(args: argparse.Namespace) -> None:
     )
 
 
+async def cmd_cli_cost(args: argparse.Namespace) -> None:
+    """Cost of the individual docker CLI calls the executor makes around every job."""
+    wait_for_memory(args.min_mem_mb)
+    image = get_runtime("python").image
+    calls = {
+        "docker image inspect (image verification)": [
+            "docker",
+            "image",
+            "inspect",
+            image,
+            "--format",
+            "{{json .RepoDigests}}",
+        ],
+        "docker inspect <missing> (container-id lookup, before the container exists)": [
+            "docker",
+            "inspect",
+            "-f",
+            "{{.Id}}",
+            "sandbox-does-not-exist",
+        ],
+        "docker rm -f <missing> (post-run cleanup when --rm already removed it)": [
+            "docker",
+            "rm",
+            "-f",
+            "sandbox-does-not-exist",
+        ],
+        "docker version (client+server round trip)": [
+            "docker",
+            "version",
+            "--format",
+            "{{.Server.Version}}",
+        ],
+    }
+    out = {}
+    for name, argv in calls.items():
+        samples = [await _spawn_wait(argv) for _ in range(args.runs or 20)]
+        out[name] = summarize(samples)
+        print(f"{name}: p50={out[name]['p50_ms']}ms p95={out[name]['p95_ms']}ms", flush=True)
+    write_json(
+        "docker_cli_cost",
+        {
+            "benchmark": "docker_cli_cost",
+            "definition": "wall time of one docker CLI invocation (process spawn to exit), run "
+            "sequentially on an otherwise idle benchmark process",
+            "environment": environment(),
+            "results": out,
+        },
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name in ("latency", "overhead", "timeout"):
+    for name in ("latency", "overhead", "timeout", "cli-cost"):
         p = sub.add_parser(name)
         p.add_argument("--languages", nargs="*")
         p.add_argument("--runs", type=int, default=0)
@@ -282,9 +332,13 @@ def main() -> None:
         if name == "timeout":
             p.add_argument("--timeouts", nargs="*", type=int, default=[1, 2, 3, 5])
     args = parser.parse_args()
-    asyncio.run(
-        {"latency": cmd_latency, "overhead": cmd_overhead, "timeout": cmd_timeout}[args.cmd](args)
-    )
+    handlers = {
+        "latency": cmd_latency,
+        "overhead": cmd_overhead,
+        "timeout": cmd_timeout,
+        "cli-cost": cmd_cli_cost,
+    }
+    asyncio.run(handlers[args.cmd](args))
 
 
 if __name__ == "__main__":
