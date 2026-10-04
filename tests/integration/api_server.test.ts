@@ -412,3 +412,106 @@ describe('WS /v1/execute/stream', () => {
     });
   });
 });
+
+describe('dependency failures and malformed input', () => {
+  it('answers with a problem+json error (not a hung request) when Redis is down on submit', async () => {
+    // Regression: async handlers used to swallow rejections, so a Redis outage left the HTTP
+    // request hanging until the client gave up.
+    fake.failing = true;
+    try {
+      const res = await Promise.race([
+        api('POST', '/v1/execute/async', { auth: true, body: { language: 'python', code: 'x' } }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('request hung')), 3000)),
+      ]);
+      expect(res.status).toBeGreaterThanOrEqual(500);
+      expect(res.headers.get('content-type')).toContain('application/problem+json');
+    } finally {
+      fake.failing = false;
+    }
+  });
+
+  it('returns 400 problem+json for malformed JSON bodies', async () => {
+    const res = await fetch(`${baseUrl}/v1/execute`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: '{not json',
+    });
+    expect(res.status).toBe(400);
+    expect(res.headers.get('content-type')).toContain('application/problem+json');
+  });
+
+  it('does not let X-Forwarded-For mint fresh anonymous rate-limit buckets', async () => {
+    process.env.ALLOW_ANONYMOUS = 'true';
+    process.env.RATE_LIMIT_ANON_PER_MINUTE = '2';
+    resetConfigForTests();
+    try {
+      const codes: number[] = [];
+      for (let i = 0; i < 4; i += 1) {
+        const res = await fetch(`${baseUrl}/v1/execute/async`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-forwarded-for': `10.0.0.${i}` },
+          body: JSON.stringify({ language: 'python', code: 'x' }),
+        });
+        codes.push(res.status);
+      }
+      expect(codes.filter((c) => c === 202)).toHaveLength(2);
+    } finally {
+      process.env.ALLOW_ANONYMOUS = 'false';
+      delete process.env.RATE_LIMIT_ANON_PER_MINUTE;
+      resetConfigForTests();
+    }
+  });
+});
+
+describe('WS limits', () => {
+  function wsStart(): Promise<Array<Record<string, unknown>>> {
+    return new Promise((resolve, reject) => {
+      const frames: Array<Record<string, unknown>> = [];
+      const ws = new WebSocket(`${wsUrl}?token=${token}`);
+      ws.on('open', () =>
+        ws.send(JSON.stringify({ type: 'start', request: { language: 'python', code: 'x' } })),
+      );
+      ws.on('message', (data: Buffer) => frames.push(JSON.parse(data.toString())));
+      ws.on('close', () => resolve(frames));
+      ws.on('error', reject);
+      setTimeout(() => reject(new Error('ws timeout')), 5000);
+    });
+  }
+
+  it('enforces the per-user concurrency quota on the streaming path', async () => {
+    // Regression: the WebSocket path used to skip rate limiting and the concurrency quota.
+    process.env.MAX_CONCURRENT_JOBS = '1';
+    resetConfigForTests();
+    try {
+      // No fake worker: the first stream stays open and holds its slot.
+      const first = new WebSocket(`${wsUrl}?token=${token}`);
+      await new Promise<void>((resolve) => {
+        first.on('open', () => first.send(JSON.stringify({ type: 'start', request: { language: 'python', code: 'x' } })));
+        first.on('message', (d: Buffer) => {
+          if (JSON.parse(d.toString()).type === 'accepted') resolve();
+        });
+      });
+      const frames = await wsStart();
+      expect(frames.some((f) => f.type === 'error' && f.title === 'Concurrency Limit')).toBe(true);
+      first.close();
+    } finally {
+      delete process.env.MAX_CONCURRENT_JOBS;
+      resetConfigForTests();
+    }
+  });
+
+  it('enforces the rate limit on the streaming path', async () => {
+    process.env.RATE_LIMIT_REQUESTS_PER_MINUTE = '1';
+    resetConfigForTests();
+    const stop = startFakeWorker('x\n');
+    try {
+      await wsStart();
+      const frames = await wsStart();
+      expect(frames.some((f) => f.type === 'error' && f.title === 'Too Many Requests')).toBe(true);
+    } finally {
+      stop();
+      delete process.env.RATE_LIMIT_REQUESTS_PER_MINUTE;
+      resetConfigForTests();
+    }
+  });
+});

@@ -20,6 +20,8 @@ import type Redis from 'ioredis';
 import { authenticatePrincipal, headerBag, AuthError } from '../middleware/auth.js';
 import { validateExecutionRequest } from '../middleware/validator.js';
 import { enqueueJob, generateJobId } from './jobQueue.js';
+import { evaluateRateLimit } from '../middleware/rateLimiter.js';
+import { acquireSlot, concurrencyLimitForTier, releaseSlot } from './quota.js';
 import { createRedisConnection } from './redis.js';
 import { newTraceContext } from '../telemetry/tracing.js';
 import { logger } from '../telemetry/logger.js';
@@ -97,9 +99,19 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
 
   wss.on('close', () => clearInterval(heartbeat));
 
-  wss.on('connection', (ws: WebSocket) => {
-    handleConnection(ws as LiveSocket);
+  wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+    handleConnection(ws as LiveSocket, socketClientIp(req));
   });
+}
+
+/**
+ * Client IP for a WebSocket upgrade, mirroring Express's `trust proxy = 1`: the entry appended by
+ * the single trusted proxy (right-most X-Forwarded-For), else the socket peer.
+ */
+function socketClientIp(req: IncomingMessage): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  const last = typeof forwarded === 'string' ? forwarded.split(',').pop()?.trim() : undefined;
+  return last || req.socket.remoteAddress || 'unknown';
 }
 
 /** Send a typed frame; returns false if the socket buffer is over the high-water mark. */
@@ -110,7 +122,7 @@ function send(ws: WebSocket, frame: ServerFrame): boolean {
 }
 
 /** Drive a single streaming connection end-to-end. */
-function handleConnection(ws: LiveSocket): void {
+function handleConnection(ws: LiveSocket, ip: string): void {
   activeWebsockets.inc();
   ws.isAlive = true;
   ws.on('pong', () => {
@@ -128,8 +140,18 @@ function handleConnection(ws: LiveSocket): void {
   let subscriber: Redis | null = null;
   let lifetimeTimer: NodeJS.Timeout | null = null;
   let settled = false;
+  let cleanedUp = false;
+  let slotJobId: string | null = null;
 
   const cleanup = async (): Promise<void> => {
+    // Idempotent: both `finish()` and the socket 'close' event call this, and the gauge must be
+    // decremented exactly once per connection.
+    if (cleanedUp) return;
+    cleanedUp = true;
+    if (slotJobId) {
+      await releaseSlot(principal.user_id, slotJobId);
+      slotJobId = null;
+    }
     if (lifetimeTimer) clearTimeout(lifetimeTimer);
     if (subscriber) {
       try {
@@ -193,7 +215,29 @@ function handleConnection(ws: LiveSocket): void {
       return;
     }
 
+    // The streaming path must obey the same limits as POST /v1/execute.
+    const rate = await evaluateRateLimit(principal!, ip);
+    if (rate.blocked) {
+      send(ws, {
+        type: 'error',
+        title: 'Too Many Requests',
+        detail: `Rate limit exceeded. Retry after ${Math.ceil(rate.retryAfterMs / 1000)}s.`,
+      });
+      await finish();
+      return;
+    }
+
     const jobId = generateJobId();
+    if (!(await acquireSlot(principal!.user_id, jobId, principal!.tier))) {
+      send(ws, {
+        type: 'error',
+        title: 'Concurrency Limit',
+        detail: `You may run at most ${concurrencyLimitForTier(principal!.tier)} concurrent jobs.`,
+      });
+      await finish();
+      return;
+    }
+    slotJobId = jobId;
     const trace = newTraceContext();
     const nowIso = new Date().toISOString();
 
