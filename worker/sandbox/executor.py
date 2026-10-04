@@ -14,6 +14,7 @@ executor is unit-testable with fakes, while the production path drives the real 
 from __future__ import annotations
 
 import asyncio
+import codecs
 import contextlib
 import os
 import shutil
@@ -386,13 +387,18 @@ class SandboxExecutor:
         """Read a stream to EOF, capturing under the cap and forwarding chunks to ``on_output``."""
         if stream is None:
             return
+        # Incremental decoder: a multi-byte character split across two reads must not turn into
+        # two U+FFFD replacement characters.
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         while True:
             chunk = await stream.read(_READ_CHUNK)
+            text = decoder.decode(chunk, final=not chunk)
+            if text:
+                kept = capture.append(kind, text)
+                if on_output is not None and kept:
+                    await on_output(kind, kept)
             if not chunk:
                 break
-            kept = capture.append(kind, chunk.decode("utf-8", "replace"))
-            if on_output is not None and kept:
-                await on_output(kind, kept)
 
     def _build_result(
         self,
