@@ -33,7 +33,9 @@ export const executionsSubmittedTotal = new client.Counter({
 });
 
 export const executionsCompletedTotal = new client.Counter({
-  name: 'sandbox_executions_total',
+  // Distinct from the worker's `sandbox_executions_total`: both services scrape into the same
+  // Prometheus, and sharing a name made sync jobs count twice in every dashboard/alert.
+  name: 'sandbox_api_executions_total',
   help: 'Total executions observed reaching a terminal state (from the API perspective).',
   labelNames: ['language', 'status'] as const,
   registers: [registry],
