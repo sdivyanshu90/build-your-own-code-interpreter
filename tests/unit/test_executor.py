@@ -292,6 +292,12 @@ class TestSandboxExecutorUnit:
         signals = [sig for (name, sig) in fake_docker.killed if name == "sandbox-jobladder"]
         assert "TERM" in signals and "KILL" in signals
 
+    async def test_container_runs_under_an_init_process(self, make_executor, fake_docker):
+        # Regression: without --init the interpreter is PID 1 and ignores the SIGTERM of the
+        # TERM->KILL ladder, so every timeout cost the whole grace period.
+        await make_executor().execute(_py(), "jobinit")
+        assert "--init" in fake_docker.last_run
+
     async def test_unkillable_container_does_not_hang_the_worker(
         self, make_executor, fake_docker, monkeypatch
     ):

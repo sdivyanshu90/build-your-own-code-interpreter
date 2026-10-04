@@ -248,6 +248,11 @@ class SandboxExecutor:
             "sandbox-managed=1",  # tag for the GC reaper
             "--stop-timeout",
             "2",  # fast SIGKILL after SIGTERM
+            # Run docker-init (tini) as PID 1. Without it the interpreter is PID 1, and the kernel
+            # does not deliver a signal that has no handler to a namespace's init: the SIGTERM
+            # of our SIGTERM->SIGKILL ladder would be ignored by nearly every program and every
+            # timeout would cost the full grace period. tini forwards the signal to the child.
+            "--init",
         ]
         cmd += runtime.limits.to_docker_flags()  # memory, swap-off, cpus, pids, tmpfs, ulimits, net
         if runtime.needs_exec_build:
