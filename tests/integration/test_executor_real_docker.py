@@ -105,8 +105,11 @@ class TestRealDockerExecution:
         require_language("python")
         code = "print(open('/proc/1/cmdline','rb').read())"
         result = await _run(real_executor, "python", code)
-        # PID 1 inside the container is the sandboxed runtime, never the host init.
-        assert "docker" not in result.stdout and "systemd" not in result.stdout
+        # PID 1 inside the container is docker-init (tini) wrapping the sandboxed runtime, never
+        # the host's init or the container daemon.
+        assert "python3" in result.stdout
+        for host_process in ("dockerd", "containerd", "systemd"):
+            assert host_process not in result.stdout
 
     async def test_python_cannot_read_etc_shadow(self, real_executor, require_language):
         require_language("python")
