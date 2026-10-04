@@ -7,6 +7,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { logger } from '../telemetry/logger.js';
+import { CircuitOpenError } from '../services/redis.js';
 
 /** The RFC 7807 Problem Details body shape. */
 export interface ProblemDetails {
@@ -74,6 +75,32 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Wrap an async route handler so a rejected promise is forwarded to `next` (and therefore to the
+ * terminal error handler) instead of becoming an unhandled rejection that leaves the request
+ * hanging. Express 4 does not do this on its own.
+ */
+export function asyncHandler(
+  fn: (req: Request, res: Response) => Promise<void>,
+): (req: Request, res: Response, next: NextFunction) => void {
+  return (req, res, next) => {
+    fn(req, res).catch(next);
+  };
+}
+
+/** True for errors that mean "a backing service (Redis) is unreachable or fast-failing". */
+function isDependencyError(err: unknown): boolean {
+  if (err instanceof CircuitOpenError) return true;
+  if (!(err instanceof Error)) return false;
+  const code = (err as Error & { code?: string }).code;
+  return (
+    err.name === 'MaxRetriesPerRequestError' ||
+    err.message === 'Connection is closed.' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ECONNRESET'
+  );
+}
+
 /** Express 404 handler for unmatched routes. */
 export function notFoundHandler(req: Request, res: Response): void {
   problem(res, 404, 'Not Found', `No route for ${req.method} ${req.path}.`, req.path);
@@ -95,6 +122,38 @@ export function errorHandler(
       ...(err.code ? { code: err.code } : {}),
       ...(err.extra ?? {}),
     });
+    return;
+  }
+
+  if (isDependencyError(err)) {
+    logger.error({ err: (err as Error).message, path: req.path }, 'dependency unavailable');
+    res.setHeader('Retry-After', '5');
+    problem(
+      res,
+      503,
+      'Service Unavailable',
+      'A backing service is temporarily unavailable. Retry shortly.',
+      req.path,
+      { code: 'service-unavailable' },
+    );
+    return;
+  }
+
+  // Client errors raised by body-parser (malformed JSON, payload too large, ...).
+  const clientStatus = (err as { status?: unknown } | null)?.status;
+  const bodyType = (err as { type?: unknown } | null)?.type;
+  if (
+    typeof clientStatus === 'number' &&
+    clientStatus >= 400 &&
+    clientStatus < 500 &&
+    typeof bodyType === 'string' &&
+    bodyType.startsWith('entity.')
+  ) {
+    const detail =
+      bodyType === 'entity.too.large'
+        ? 'The request body is too large.'
+        : 'The request body could not be parsed.';
+    problem(res, clientStatus, 'Bad Request', detail, req.path, { code: 'validation-error' });
     return;
   }
 

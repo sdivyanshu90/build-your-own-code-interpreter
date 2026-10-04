@@ -15,7 +15,7 @@ import { getPrincipal } from '../middleware/auth.js';
 import { getValidated, validateExecuteBody } from '../middleware/validator.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { rateLimitMiddleware } from '../middleware/rateLimiter.js';
-import { problem } from '../middleware/errorHandler.js';
+import { asyncHandler, problem } from '../middleware/errorHandler.js';
 import { enqueueJob, generateJobId } from '../services/jobQueue.js';
 import { acquireSlot, concurrencyLimitForTier, releaseSlot } from '../services/quota.js';
 import { waitForTerminal } from '../services/resultStore.js';
@@ -93,42 +93,40 @@ executeRouter.post(
   authMiddleware,
   rateLimitMiddleware,
   validateExecuteBody,
-  (req: Request, res: Response) => {
-    void (async (): Promise<void> => {
-      const submitted = await submit(req, res, 'sync');
-      if (!submitted) return;
-      const { jobId } = submitted;
-      const principal = getPrincipal(req);
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const submitted = await submit(req, res, 'sync');
+    if (!submitted) return;
+    const { jobId } = submitted;
+    const principal = getPrincipal(req);
 
-      const config = getConfig();
-      const request = getValidated(req);
-      // The sync window is the smaller of the configured cap and the job's own timeout + slack.
-      const windowMs =
-        Math.min(config.SYNC_EXECUTION_TIMEOUT_SECONDS, request.timeout_seconds! + 5) * 1000;
+    const config = getConfig();
+    const request = getValidated(req);
+    // The sync window is the smaller of the configured cap and the job's own timeout + slack.
+    const windowMs =
+      Math.min(config.SYNC_EXECUTION_TIMEOUT_SECONDS, request.timeout_seconds! + 5) * 1000;
 
-      const record = await waitForTerminal(jobId, windowMs);
-      await releaseSlot(principal.user_id, jobId);
+    const record = await waitForTerminal(jobId, windowMs);
+    await releaseSlot(principal.user_id, jobId);
 
-      if (!record || record.status === 'PENDING' || record.status === 'RUNNING') {
-        // The job did not finish within the synchronous window.
-        problem(
-          res,
-          408,
-          'Execution Timeout',
-          'The execution did not complete within the synchronous window. Use /v1/execute/async ' +
-            'and poll /v1/jobs/{id} for long-running jobs.',
-          req.path,
-          { code: 'sync-timeout', job_id: jobId },
-        );
-        executionsCompletedTotal.inc({ language: record?.language ?? 'python', status: 'TIMEOUT' });
-        return;
-      }
+    if (!record || record.status === 'PENDING' || record.status === 'RUNNING') {
+      // The job did not finish within the synchronous window.
+      problem(
+        res,
+        408,
+        'Execution Timeout',
+        'The execution did not complete within the synchronous window. Use /v1/execute/async ' +
+          'and poll /v1/jobs/{id} for long-running jobs.',
+        req.path,
+        { code: 'sync-timeout', job_id: jobId },
+      );
+      executionsCompletedTotal.inc({ language: record?.language ?? 'python', status: 'TIMEOUT' });
+      return;
+    }
 
-      const result = record.result ?? fallbackResult(record);
-      executionsCompletedTotal.inc({ language: record.language, status: record.status });
-      res.status(200).json(result);
-    })();
-  },
+    const result = record.result ?? fallbackResult(record);
+    executionsCompletedTotal.inc({ language: record.language, status: record.status });
+    res.status(200).json(result);
+}),
 );
 
 /**
@@ -146,17 +144,15 @@ executeRouter.post(
   authMiddleware,
   rateLimitMiddleware,
   validateExecuteBody,
-  (req: Request, res: Response) => {
-    void (async (): Promise<void> => {
-      const submitted = await submit(req, res, 'async');
-      if (!submitted) return;
-      res.status(202).json({
-        job_id: submitted.jobId,
-        status: 'PENDING',
-        poll_url: `/v1/jobs/${submitted.jobId}`,
-      });
-    })();
-  },
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const submitted = await submit(req, res, 'async');
+    if (!submitted) return;
+    res.status(202).json({
+      job_id: submitted.jobId,
+      status: 'PENDING',
+      poll_url: `/v1/jobs/${submitted.jobId}`,
+    });
+}),
 );
 
 /** Build a minimal result when a terminal record lacks a stored result (defensive). */

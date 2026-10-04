@@ -6,6 +6,7 @@ import {
   errorHandler,
   notFoundHandler,
   problem,
+  asyncHandler,
 } from '../../api/src/middleware/errorHandler.js';
 
 /** A minimal Express Response double that records what was written. */
@@ -30,6 +31,8 @@ function fakeRes(): Response & { _status: number; _json: Record<string, unknown>
   };
   return res as unknown as Response & { _status: number; _json: Record<string, unknown>; _type: string };
 }
+
+import { CircuitOpenError } from '../../api/src/services/redis.js';
 
 const fakeReq = (path = '/v1/x'): Request => ({ path, method: 'POST' }) as unknown as Request;
 
@@ -75,5 +78,39 @@ describe('errorHandler', () => {
     res.headersSent = true;
     errorHandler(new Error('x'), fakeReq(), res, vi.fn());
     expect(res._status).toBe(0);
+  });
+});
+
+describe('dependency and client errors', () => {
+  const withHeader = (res: ReturnType<typeof fakeRes>): ReturnType<typeof fakeRes> => {
+    (res as unknown as { setHeader: () => void }).setHeader = () => undefined;
+    return res;
+  };
+
+  it('maps an open circuit breaker to 503 with a safe body', () => {
+    const res = withHeader(fakeRes());
+    errorHandler(new CircuitOpenError('redis'), fakeReq(), res, vi.fn());
+    expect(res._status).toBe(503);
+    expect(JSON.stringify(res._json)).not.toContain('redis');
+  });
+
+  it('maps a body-parser parse failure to 400 instead of 500', () => {
+    const res = fakeRes();
+    const err = Object.assign(new SyntaxError('Unexpected token'), {
+      status: 400,
+      type: 'entity.parse.failed',
+    });
+    errorHandler(err, fakeReq(), res, vi.fn());
+    expect(res._status).toBe(400);
+  });
+
+  it('asyncHandler forwards rejections to next()', async () => {
+    const next = vi.fn();
+    const boom = new Error('boom');
+    asyncHandler(async () => {
+      throw boom;
+    })(fakeReq(), fakeRes(), next);
+    await new Promise((r) => setImmediate(r));
+    expect(next).toHaveBeenCalledWith(boom);
   });
 });
