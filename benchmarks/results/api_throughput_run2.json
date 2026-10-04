@@ -1,0 +1,168 @@
+{
+  "benchmark": "api_throughput",
+  "definition": "closed loop: each of N threads repeatedly POSTs /v1/execute (python hello) for 20s. Latency = client wall time for completed requests. worker_concurrency=4.",
+  "stack": {
+    "worker_concurrency": 4
+  },
+  "environment": {
+    "date_utc": "2026-10-04T17:29:36+00:00",
+    "git_sha": "3599f5b",
+    "cpu_model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+    "cpu_count": 8,
+    "mem_total_mb": 5928,
+    "kernel": "6.18.40.1-microsoft-standard-WSL2",
+    "docker_server": "29.4.3",
+    "docker_cgroup": "2 systemd",
+    "python": "3.12.13",
+    "loadavg_1_5_15": "15.34 11.01 7.99",
+    "mem_available_mb": 4269,
+    "note": "shared WSL2 machine; other workloads may run concurrently (see README caveats)"
+  },
+  "results": {
+    "1": {
+      "client_threads": 1,
+      "duration_s": 20.7,
+      "completed": 10,
+      "errors": {
+        "non200": 0,
+        "exc": 0
+      },
+      "throughput_per_s": 0.48,
+      "latency": {
+        "n": 10,
+        "min_ms": 1339.5,
+        "p50_ms": 1564.6,
+        "p95_ms": 6279.9,
+        "p99_ms": 6279.9,
+        "max_ms": 6279.9,
+        "mean_ms": 2067.4
+      },
+      "loadavg1_start_end": [
+        13.77,
+        12.38
+      ],
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 72.1,
+        "code-sandbox-worker-1": 108.8,
+        "code-sandbox-redis-1": 11.0,
+        "code-sandbox-minio-1": 270.9
+      }
+    },
+    "2": {
+      "client_threads": 2,
+      "duration_s": 35.3,
+      "completed": 20,
+      "errors": {
+        "non200": 2,
+        "exc": 0
+      },
+      "throughput_per_s": 0.57,
+      "latency": {
+        "n": 20,
+        "min_ms": 1048.9,
+        "p50_ms": 1534.2,
+        "p95_ms": 4949.5,
+        "p99_ms": 5054.8,
+        "max_ms": 5054.8,
+        "mean_ms": 1990.0
+      },
+      "loadavg1_start_end": [
+        11.39,
+        9.13
+      ],
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 71.8,
+        "code-sandbox-worker-1": 133.9,
+        "code-sandbox-redis-1": 14.1,
+        "code-sandbox-minio-1": 273.0
+      }
+    },
+    "4": {
+      "client_threads": 4,
+      "duration_s": 20.7,
+      "completed": 32,
+      "errors": {
+        "non200": 0,
+        "exc": 0
+      },
+      "throughput_per_s": 1.55,
+      "latency": {
+        "n": 32,
+        "min_ms": 1244.5,
+        "p50_ms": 2328.1,
+        "p95_ms": 4489.8,
+        "p99_ms": 4694.7,
+        "max_ms": 4694.7,
+        "mean_ms": 2563.0
+      },
+      "loadavg1_start_end": [
+        8.64,
+        11.12
+      ],
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 73.0,
+        "code-sandbox-worker-1": 133.8,
+        "code-sandbox-redis-1": 10.5,
+        "code-sandbox-minio-1": 277.4
+      }
+    },
+    "8": {
+      "client_threads": 8,
+      "duration_s": 36.5,
+      "completed": 44,
+      "errors": {
+        "non200": 4,
+        "exc": 0
+      },
+      "throughput_per_s": 1.21,
+      "latency": {
+        "n": 44,
+        "min_ms": 1584.7,
+        "p50_ms": 3727.6,
+        "p95_ms": 4512.5,
+        "p99_ms": 5148.5,
+        "max_ms": 5148.5,
+        "mean_ms": 3602.6
+      },
+      "loadavg1_start_end": [
+        10.23,
+        14.3
+      ],
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 75.7,
+        "code-sandbox-worker-1": 142.6,
+        "code-sandbox-redis-1": 10.8,
+        "code-sandbox-minio-1": 276.1
+      }
+    },
+    "16": {
+      "client_threads": 16,
+      "duration_s": 35.4,
+      "completed": 28,
+      "errors": {
+        "non200": 16,
+        "exc": 0
+      },
+      "throughput_per_s": 0.79,
+      "latency": {
+        "n": 28,
+        "min_ms": 1731.3,
+        "p50_ms": 6948.9,
+        "p95_ms": 13547.7,
+        "p99_ms": 13842.1,
+        "max_ms": 13842.1,
+        "mean_ms": 6596.7
+      },
+      "loadavg1_start_end": [
+        14.3,
+        15.54
+      ],
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 90.8,
+        "code-sandbox-worker-1": 139.9,
+        "code-sandbox-redis-1": 10.9,
+        "code-sandbox-minio-1": 276.0
+      }
+    }
+  }
+}

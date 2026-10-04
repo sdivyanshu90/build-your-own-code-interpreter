@@ -39,6 +39,8 @@ python benchmarks/bench_security.py
 python benchmarks/bench_executor.py latency                 # all 8 languages
 python benchmarks/bench_executor.py overhead --runs 20      # python, bash, javascript
 python benchmarks/bench_executor.py timeout --runs 5        # infinite loops, T = 1,2,3,5 s
+python benchmarks/bench_executor.py cli-cost                # cost of the docker CLI calls around each job
+python benchmarks/bench_executor.py concurrency             # N concurrent hello-worlds (not completed in the documented run)
 
 # 3. full stack (api + worker + redis + minio), memory-capped
 export API_PORT=18080 REDIS_PORT=16380 MINIO_PORT=19000 MINIO_CONSOLE_PORT=19001 WORKER_CONCURRENCY=4

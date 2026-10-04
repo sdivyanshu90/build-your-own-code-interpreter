@@ -1,3 +1,4 @@
+# ruff: noqa: B023  (closures in cmd_concurrency are awaited to completion inside each loop iteration)
 """Executor-level benchmarks (real Docker, no Redis/API): latency, overhead, timeout accuracy.
 
 Drives ``worker.sandbox.executor.SandboxExecutor`` directly, so the numbers isolate the sandbox
@@ -321,14 +322,68 @@ async def cmd_cli_cost(args: argparse.Namespace) -> None:
     )
 
 
+async def cmd_concurrency(args: argparse.Namespace) -> None:
+    """Executor-level throughput: N concurrent python hello-worlds, no Redis/API."""
+    wait_for_memory(args.min_mem_mb)
+    workdir = tempfile.mkdtemp(prefix="bench-")
+    out: dict[str, object] = {}
+    try:
+        executor = _executor(workdir)
+        await _timed(executor, "python", HELLO["python"], "bcwarm")
+        for conc in args.levels:
+            total = args.runs or 24
+            lat: list[float] = []
+            statuses: dict[str, int] = {}
+            sem = asyncio.Semaphore(conc)
+            load0 = os.getloadavg()[0]
+
+            async def one(i: int, conc: int = conc) -> None:
+                async with sem:
+                    ms, res = await _timed(executor, "python", HELLO["python"], f"bc{conc}x{i}")
+                    lat.append(ms)
+                    statuses[res.status] = statuses.get(res.status, 0) + 1
+
+            start = time.perf_counter()
+            await asyncio.gather(*(one(i) for i in range(total)))
+            elapsed = time.perf_counter() - start
+            out[str(conc)] = {
+                "concurrency": conc,
+                "jobs": total,
+                "elapsed_s": round(elapsed, 1),
+                "throughput_per_s": round(total / elapsed, 2),
+                "latency": summarize(lat),
+                "statuses": statuses,
+                "loadavg1_start_end": [round(load0, 2), round(os.getloadavg()[0], 2)],
+            }
+            print(
+                f"conc={conc} {total} jobs in {elapsed:.1f}s = {total / elapsed:.2f}/s "
+                f"p50={out[str(conc)]['latency']['p50_ms']}ms {statuses}",
+                flush=True,
+            )  # type: ignore[index]
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+    write_json(
+        "executor_concurrency",
+        {
+            "benchmark": "executor_concurrency",
+            "definition": "closed loop over N python hello-worlds with at most `concurrency` in "
+            "flight through one SandboxExecutor (no queue, no API)",
+            "environment": environment(),
+            "results": out,
+        },
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name in ("latency", "overhead", "timeout", "cli-cost"):
+    for name in ("latency", "overhead", "timeout", "cli-cost", "concurrency"):
         p = sub.add_parser(name)
         p.add_argument("--languages", nargs="*")
         p.add_argument("--runs", type=int, default=0)
         p.add_argument("--min-mem-mb", type=int, default=1500)
+        if name == "concurrency":
+            p.add_argument("--levels", nargs="*", type=int, default=[1, 2, 4, 8])
         if name == "timeout":
             p.add_argument("--timeouts", nargs="*", type=int, default=[1, 2, 3, 5])
     args = parser.parse_args()
@@ -337,6 +392,7 @@ def main() -> None:
         "overhead": cmd_overhead,
         "timeout": cmd_timeout,
         "cli-cost": cmd_cli_cost,
+        "concurrency": cmd_concurrency,
     }
     asyncio.run(handlers[args.cmd](args))
 

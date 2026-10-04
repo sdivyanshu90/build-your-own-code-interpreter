@@ -245,6 +245,34 @@ def sections() -> dict[str, str]:
             out[f"API_{key}"] = api_table(d)
         if d := load(f"api_throughput{suffix}"):
             out[f"THR_{key}"] = throughput_table(d)
+    if d := load("executor_concurrency"):
+        out["CONC"] = table(
+            [
+                "concurrency",
+                "jobs",
+                "seconds",
+                "jobs/s",
+                "p50 ms",
+                "p95 ms",
+                "max ms",
+                "statuses",
+                "load avg start -> end",
+            ],
+            [
+                [
+                    k,
+                    v["jobs"],
+                    v["elapsed_s"],
+                    v["throughput_per_s"],
+                    v["latency"]["p50_ms"],
+                    v["latency"]["p95_ms"],
+                    v["latency"]["max_ms"],
+                    json.dumps(v["statuses"]),
+                    " -> ".join(str(x) for x in v["loadavg1_start_end"]),
+                ]
+                for k, v in d["results"].items()
+            ],
+        )
     if d := load("idle_memory"):
         out["IDLE"] = table(["container", "MiB"], [[k, v] for k, v in d["results_mib"].items()])
     if d := load("security_and_integration"):

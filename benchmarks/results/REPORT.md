@@ -110,6 +110,16 @@
 | 8 | 12 | 28 | 0.42 | 8,947 | 10,880 | 10,880 | 8 | 83 | 159 | 29 | 306 |
 | 16 | 56 | 27 | 2.09 | 6,996 | 8,561 | 9,628 | 0 | 57 | 142 | 28 | 303 |
 
+### THR_RUN2
+
+| client threads | completed | seconds | req/s | p50 ms | p95 ms | p99 ms | errors | peak api MiB | peak worker MiB | peak redis MiB | peak minio MiB |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 10 | 21 | 0.48 | 1,565 | 6,280 | 6,280 | 0 | 72 | 109 | 11.00 | 271 |
+| 2 | 20 | 35 | 0.57 | 1,534 | 4,950 | 5,055 | 2 | 72 | 134 | 14.10 | 273 |
+| 4 | 32 | 21 | 1.55 | 2,328 | 4,490 | 4,695 | 0 | 73 | 134 | 10.50 | 277 |
+| 8 | 44 | 36 | 1.21 | 3,728 | 4,512 | 5,148 | 4 | 76 | 143 | 10.80 | 276 |
+| 16 | 28 | 35 | 0.79 | 6,949 | 13,548 | 13,842 | 16 | 91 | 140 | 10.90 | 276 |
+
 ### IDLE
 
 | container | MiB |
@@ -121,4 +131,4 @@
 
 ### SEC
 
-`bench_security.py` (`tests/security` + `tests/integration`, real containers): **58 passed, 1 failed, 0 errors, 0 skipped** (per-case outcomes in `results/security_and_integration.json`).
+`bench_security.py` (`tests/security` + `tests/integration`, real containers): **59 passed, 0 failed, 0 errors, 0 skipped** (per-case outcomes in `results/security_and_integration.json`).
