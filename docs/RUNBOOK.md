@@ -205,15 +205,18 @@ Worker metrics (port 9100) and API metrics (`GET /v1/metrics` on 8080):
 
 | Metric | Type | Labels | Meaning |
 |--------|------|--------|---------|
-| `sandbox_executions_total` | counter | `language`, `status` | Executions by terminal status |
+| `sandbox_executions_total` | counter | `language`, `status` | Executions by terminal status (**worker** only; the API's equivalent is `sandbox_api_executions_total`, renamed to stop double counting) |
 | `sandbox_execution_duration_seconds` | histogram | `language` | Wall-clock execution time |
-| `sandbox_queue_depth` | gauge | — | Approx pending jobs in the stream |
-| `sandbox_container_startup_seconds` | histogram | — | Pickup → container start |
+| `sandbox_queue_depth` | gauge | — | Backlog: stream length. Processed entries are `XDEL`ed after `XACK`, so this is queued + in-flight (it previously only ever grew) |
+| `sandbox_container_startup_seconds` | histogram | — | `docker run` spawn → container exists (sampled every 50 ms, so resolution is about 50 ms). Previously defined but never recorded |
 | `sandbox_oom_kills_total` | counter | — | Executions killed by the OOM killer |
 | `sandbox_timeout_kills_total` | counter | — | Executions killed by the wall-clock timeout |
 | `sandbox_jobs_in_flight` | gauge | — | Jobs executing on this worker |
 | `sandbox_reclaimed_jobs_total` | counter | — | Stale jobs reclaimed from dead workers |
 | `sandbox_dead_lettered_total` | counter | — | Jobs moved to the dead-letter stream |
+| `sandbox_api_executions_total` | counter | `language`, `status` | Sync executions seen by the API |
+| `sandbox_executions_submitted_total` | counter | `language`, `mode` | Submissions accepted by the API |
+| `sandbox_api_active_websockets` | gauge | — | Open streaming connections |
 | `sandbox_api_http_requests_total` | counter | `method`, `route`, `code` | API requests |
 | `sandbox_api_rate_limited_total` | counter | `tier` | Requests rejected by the rate limiter |
 
@@ -368,7 +371,9 @@ redis-cli XRANGE sandbox:jobs:dead - +
 redis-cli XADD sandbox:jobs '*' payload '<the payload JSON from the dead entry>'
 ```
 
-Re-drive selectively — a payload that was dead-lettered for being malformed will simply be
+The original job record is already `FAILED` with a stored result; a re-driven run overwrites it
+(status goes back to `RUNNING`, then terminal) and does **not** re-acquire the user's concurrency
+slot. Re-drive selectively — a payload that was dead-lettered for being malformed will simply be
 dead-lettered again. Trim the dead stream once entries are handled
 (`XTRIM sandbox:jobs:dead MINID <id>` or `XDEL`).
 
