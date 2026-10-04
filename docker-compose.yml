@@ -95,6 +95,9 @@ services:
       SANDBOX_HOST_WORKDIR: ${SANDBOX_HOST_WORKDIR:-/tmp/code-sandbox-work}
       SANDBOX_IMAGE_TAG: ${SANDBOX_IMAGE_TAG:-latest}
       METRICS_PORT: "9100"
+    # The worker drains in-flight jobs on SIGTERM; give the longest job (25 s ceiling) plus the
+    # up-to-5 s XREADGROUP block time to finish before Docker escalates to SIGKILL (default 10 s).
+    stop_grace_period: 45s
     volumes:
       # Drive sibling sandbox containers via the host daemon.
       - /var/run/docker.sock:/var/run/docker.sock
