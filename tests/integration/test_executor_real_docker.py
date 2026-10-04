@@ -152,21 +152,21 @@ class TestRealDockerExecution:
 
     async def test_container_is_not_present_after_execution(self, real_executor, require_language):
         require_language("python")
-        await _run(real_executor, "python", "print('done')")
+        request = ExecutionRequest(language="python", code="print('done')", timeout_seconds=15)
+        await real_executor.execute(request, "it-cleanup-check")
         proc = await asyncio.create_subprocess_exec(
             "docker",
             "ps",
             "-a",
             "--filter",
-            "label=sandbox-managed=1",
+            "name=sandbox-it-cleanup-check",
             "--format",
             "{{.ID}}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         out, _ = await proc.communicate()
-        # Any leftover would be reaped; immediately after --rm there should be none from us.
-        assert out.decode().strip() == "" or True  # tolerant: other tests may run concurrently
+        assert out.decode().strip() == ""
 
     async def test_temp_files_cleaned_up_on_host(
         self, real_executor, worker_config, require_language
