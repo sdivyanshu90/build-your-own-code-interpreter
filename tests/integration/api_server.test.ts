@@ -463,6 +463,15 @@ describe('dependency failures and malformed input', () => {
   });
 });
 
+describe('metrics label cardinality', () => {
+  it('does not create a label value per unmatched path', async () => {
+    await fetch(`${baseUrl}/v1/definitely-not-a-route-4242`);
+    const text = await (await fetch(`${baseUrl}/v1/metrics`)).text();
+    expect(text).not.toContain('definitely-not-a-route-4242');
+    expect(text).toContain('route="unmatched"');
+  });
+});
+
 describe('WS limits', () => {
   function wsStart(): Promise<Array<Record<string, unknown>>> {
     return new Promise((resolve, reject) => {
