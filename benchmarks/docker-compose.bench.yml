@@ -12,12 +12,9 @@ services:
   redis:
     mem_limit: 128m
   minio:
-    # The MinIO tag pinned in the base file (minio/minio:RELEASE.2024-11-07T00-52-20Z) could not be
-    # pulled on the benchmark date (Docker Hub: not found; quay.io: 401). Use an image that is
-    # already present locally; the worker creates the bucket itself, so `createbuckets` (whose
-    # minio/mc tag was also unpullable) is not started.
-    image: ${BENCH_MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z}
-    pull_policy: never
+    # The committed results (2026-10-04) were measured with quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    # from the local image cache, before the base file moved to the Chainguard image. MinIO only serves
+    # result archives, off the measured execution path.
     mem_limit: 384m
   api:
     mem_limit: 256m

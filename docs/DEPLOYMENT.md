@@ -10,7 +10,7 @@ run on the benchmark host (WSL2, Docker 29.4.3, cgroup v2 with the systemd drive
 | Service (compose) | Image | Role | State |
 |---|---|---|---|
 | `redis` | `redis:7.4.1-alpine` | queue, records, results, quotas, pub/sub; AOF `everysec` | volume `redis-data` |
-| `minio` + `createbuckets` | pinned MinIO/mc | result archive bucket | volume `minio-data` |
+| `minio` + `createbuckets` | `cgr.dev/chainguard/minio` (digest-pinned; override with `MINIO_IMAGE`) | result archive bucket | volume `minio-data` |
 | `api` | built from `api/` | HTTP + WebSocket gateway, stateless | none |
 | `worker` | built from `worker/` | consumes jobs, launches sandboxes through the host Docker socket | none (per-job dirs under `SANDBOX_HOST_WORKDIR`) |
 | `prometheus`, `loki`, `promtail`, `grafana` | pinned | observability | volumes |

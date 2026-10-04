@@ -36,7 +36,7 @@ Types are the zod schema types. "int>0" means a positive integer, parsed with `z
 | Variable | Type | Default | Effect |
 |---|---|---|---|
 | `REDIS_URL` | URL, must start `redis://` or `rediss://` | **required** | All queue, KV, rate-limit and pub/sub traffic. |
-| `MINIO_ENDPOINT` | string, min 1 | **required** | MinIO **host name only** for the API (`new Client({endPoint, port})`). See the note below. |
+| `MINIO_ENDPOINT` | string, min 1 | **required** | MinIO host. A `host:port` value is split into host + `MINIO_PORT` (`api/src/config.ts`), so the compose value `minio:9000` works for both services. |
 | `MINIO_PORT` | int 1-65535 | `9000` | MinIO port. |
 | `MINIO_USE_SSL` | `true`\|`false` | `false` | TLS to MinIO. |
 | `MINIO_ACCESS_KEY` | string, min 3 | **required** | |
@@ -88,10 +88,11 @@ A concurrency slot is a sorted-set member with a TTL of `MAX_TIMEOUT_SECONDS + 1
 slot self-heals even if nothing releases it. The worker releases it when the job finishes; the API
 releases it on sync completion and on cancel.
 
-**MinIO endpoint pitfall.** `docker-compose.yml` sets `MINIO_ENDPOINT: minio:9000` for *both*
-services. The worker's MinIO client wants `host:port`; the API's wants a bare host plus
-`MINIO_PORT`. See [TROUBLESHOOTING](TROUBLESHOOTING.md#health-reports-minio-down-although-minio-is-running)
-for the symptom and the fix that shipped with this branch.
+**MinIO endpoint.** `docker-compose.yml` sets `MINIO_ENDPOINT: minio:9000` for *both*
+services. The worker's MinIO client wants `host:port`; the MinIO JS client in the API wants a bare
+host plus a port, so the API config splits a `host:port` value itself (before this branch it threw
+`Invalid endPoint` and `/v1/health` reported MinIO down; see
+[TROUBLESHOOTING](TROUBLESHOOTING.md#health-reports-minio-down-although-minio-is-running)).
 
 ## Worker service (`worker/config.py`)
 
@@ -140,7 +141,8 @@ The registry is built once at import; `reload_registry()` rebuilds it (used by t
 These are interpolated by Compose and are not read by application code: `API_PORT`, `REDIS_PORT`,
 `MINIO_PORT` (host side), `MINIO_CONSOLE_PORT`, `PROMETHEUS_PORT`, `LOKI_PORT`, `GRAFANA_PORT`,
 `GRAFANA_USER`, `GRAFANA_PASSWORD`, `IMAGE_REGISTRY`, `IMAGE_TAG` (prod overlay), `API_REPLICAS`,
-`WORKER_REPLICAS`, `REDIS_MAXMEMORY`, `SANDBOX_DIGEST_*` pass-through for python/javascript/bash only
+`WORKER_REPLICAS`, `REDIS_MAXMEMORY`, `MINIO_IMAGE` (image for `minio` and `createbuckets`;
+defaults to the digest-pinned `cgr.dev/chainguard/minio`), `SANDBOX_DIGEST_*` pass-through for python/javascript/bash only
 in `docker-compose.prod.yml`.
 
 Compose defaults that differ from the code defaults: `ALLOW_ANONYMOUS=true`,

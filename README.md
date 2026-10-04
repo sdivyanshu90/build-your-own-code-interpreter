@@ -54,7 +54,8 @@ care. Commands, raw data and caveats: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)
 [`benchmarks/`](benchmarks/README.md).
 
 Hello-world execution through `SandboxExecutor` against real Docker, warm runs, milliseconds
-(executor run 1; `container` = container creation + program + teardown, `total` adds the executor's
+(executor run 1, taken before the `--init` change on the quietest host; raw data in
+`benchmarks/results/executor_latency_before_init.json`; `container` = container creation + program + teardown, `total` adds the executor's
 docker CLI round trips):
 
 | language | container p50 | total p50 | total p95 | first run (cold) |

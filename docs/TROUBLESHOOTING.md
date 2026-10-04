@@ -100,12 +100,13 @@ Auth failures never complete the upgrade (HTTP 401/403 on the upgrade request).
 ## Stack start-up
 
 ### `docker compose up` fails pulling `minio/mc` or `minio/minio`
-Observed on 2026-10-04: `pull access denied for minio/mc` and `minio/minio:RELEASE.2024-11-07T00-52-20Z`
-not found on Docker Hub, `401` from quay.io. MinIO has been withdrawing its prebuilt community
-images, so the tags pinned in `docker-compose.yml` may be unobtainable. Options: point
-`image:` at a MinIO image you can pull or build, or at any S3-compatible store. `createbuckets` is
-optional: the worker creates the bucket itself at start-up (`ResultStore.ensure_bucket`). The
-benchmark overlay (`benchmarks/docker-compose.bench.yml`) shows the minimal override.
+The upstream `minio/minio` and `minio/mc` repositories were removed from Docker Hub (the Hub API
+returns `object not found` for both; quay.io answers `401`), so the tags this repo originally pinned
+no longer pull. `docker-compose.yml` now uses `cgr.dev/chainguard/minio`, pinned by digest, which
+ships both the `minio` server and the `mc` client used by the healthcheck and `createbuckets`.
+If that digest ever stops resolving, set `MINIO_IMAGE` to any MinIO build you can pull (or point
+the endpoint at another S3-compatible store). `createbuckets` is optional: the worker also creates
+the bucket at start-up (`ResultStore.ensure_bucket`).
 
 ## Worker and Docker
 
