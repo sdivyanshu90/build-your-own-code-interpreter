@@ -44,7 +44,7 @@ python benchmarks/bench_executor.py timeout --runs 5        # infinite loops, T 
 export API_PORT=18080 REDIS_PORT=16380 MINIO_PORT=19000 MINIO_CONSOLE_PORT=19001 WORKER_CONCURRENCY=4
 export SANDBOX_HOST_WORKDIR=/tmp/code-sandbox-work-bench
 C="docker compose -f docker-compose.yml -f benchmarks/docker-compose.bench.yml"
-$C up -d --build redis minio createbuckets api worker
+$C up -d --build redis minio api worker
 python benchmarks/bench_api.py --base http://localhost:18080 idle-memory
 python benchmarks/smoke_examples.py --base http://localhost:18080
 python benchmarks/bench_api.py --base http://localhost:18080 latency

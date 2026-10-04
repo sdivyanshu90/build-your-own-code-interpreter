@@ -2,7 +2,7 @@
 # services the benchmark needs (no Prometheus/Grafana/Loki):
 #
 #   docker compose -f docker-compose.yml -f benchmarks/docker-compose.bench.yml \
-#       up -d --build redis minio createbuckets api worker
+#       up -d --build redis minio api worker
 #
 # It (1) caps every container's memory, (2) lifts the per-user rate/concurrency limits so the
 # load generator measures the pipeline rather than the quota, and (3) pins a known JWT secret.
@@ -12,6 +12,12 @@ services:
   redis:
     mem_limit: 128m
   minio:
+    # The MinIO tag pinned in the base file (minio/minio:RELEASE.2024-11-07T00-52-20Z) could not be
+    # pulled on the benchmark date (Docker Hub: not found; quay.io: 401). Use an image that is
+    # already present locally; the worker creates the bucket itself, so `createbuckets` (whose
+    # minio/mc tag was also unpullable) is not started.
+    image: ${BENCH_MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z}
+    pull_policy: never
     mem_limit: 384m
   api:
     mem_limit: 256m
