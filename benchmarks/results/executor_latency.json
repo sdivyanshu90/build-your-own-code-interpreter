@@ -2,8 +2,8 @@
   "benchmark": "executor_latency",
   "definition": "total = perf_counter around SandboxExecutor.execute (image inspect + workdir + docker run + stream + cleanup); container_wall = executor's own spawn->exit measurement. cold = first run per language in this process (no page-cache eviction is possible without root).",
   "environment": {
-    "date_utc": "2026-10-04T15:44:24+00:00",
-    "git_sha": "5ca442f",
+    "date_utc": "2026-10-04T16:25:47+00:00",
+    "git_sha": "c529e08",
     "cpu_model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
     "cpu_count": 8,
     "mem_total_mb": 5928,
@@ -16,195 +16,195 @@
   "results": {
     "python": {
       "all_runs_completed_with_expected_output": true,
-      "cold_total_ms": 1055.8,
-      "cold_container_wall_ms": 730,
+      "cold_total_ms": 2701.5,
+      "cold_container_wall_ms": 2354,
       "warm_total": {
         "n": 30,
-        "min_ms": 747.9,
-        "p50_ms": 838.0,
-        "p95_ms": 1944.3,
-        "p99_ms": 2887.9,
-        "max_ms": 2887.9,
-        "mean_ms": 991.6
+        "min_ms": 1361.9,
+        "p50_ms": 2013.8,
+        "p95_ms": 6855.9,
+        "p99_ms": 9303.9,
+        "max_ms": 9303.9,
+        "mean_ms": 2897.2
       },
       "warm_container_wall": {
         "n": 30,
-        "min_ms": 497.0,
-        "p50_ms": 544.0,
-        "p95_ms": 804.0,
-        "p99_ms": 1049.0,
-        "max_ms": 1049.0,
-        "mean_ms": 579.2
+        "min_ms": 973.0,
+        "p50_ms": 1679.0,
+        "p95_ms": 6276.0,
+        "p99_ms": 8562.0,
+        "max_ms": 8562.0,
+        "mean_ms": 2497.1
       },
-      "memory_peak_bytes_last_run": 0
+      "memory_peak_bytes_last_run": 5828608
     },
     "javascript": {
       "all_runs_completed_with_expected_output": true,
-      "cold_total_ms": 1890.5,
-      "cold_container_wall_ms": 1596,
+      "cold_total_ms": 2279.3,
+      "cold_container_wall_ms": 1922,
       "warm_total": {
         "n": 30,
-        "min_ms": 756.7,
-        "p50_ms": 830.5,
-        "p95_ms": 1832.7,
-        "p99_ms": 1919.8,
-        "max_ms": 1919.8,
-        "mean_ms": 921.1
+        "min_ms": 759.0,
+        "p50_ms": 840.3,
+        "p95_ms": 1115.7,
+        "p99_ms": 2466.8,
+        "max_ms": 2466.8,
+        "mean_ms": 911.0
       },
       "warm_container_wall": {
         "n": 30,
-        "min_ms": 505.0,
-        "p50_ms": 556.0,
-        "p95_ms": 1568.0,
-        "p99_ms": 1627.0,
-        "max_ms": 1627.0,
-        "mean_ms": 634.0
+        "min_ms": 496.0,
+        "p50_ms": 554.0,
+        "p95_ms": 774.0,
+        "p99_ms": 2102.0,
+        "max_ms": 2102.0,
+        "mean_ms": 629.0
       },
       "memory_peak_bytes_last_run": 0
     },
     "typescript": {
       "all_runs_completed_with_expected_output": true,
-      "cold_total_ms": 1591.0,
-      "cold_container_wall_ms": 1322,
+      "cold_total_ms": 2017.3,
+      "cold_container_wall_ms": 1717,
       "warm_total": {
         "n": 15,
-        "min_ms": 1351.7,
-        "p50_ms": 1477.9,
-        "p95_ms": 3640.0,
-        "p99_ms": 3640.0,
-        "max_ms": 3640.0,
-        "mean_ms": 1807.2
+        "min_ms": 1367.8,
+        "p50_ms": 1429.0,
+        "p95_ms": 1564.6,
+        "p99_ms": 1564.6,
+        "max_ms": 1564.6,
+        "mean_ms": 1436.2
       },
       "warm_container_wall": {
         "n": 15,
-        "min_ms": 1090.0,
-        "p50_ms": 1192.0,
-        "p95_ms": 2350.0,
-        "p99_ms": 2350.0,
-        "max_ms": 2350.0,
-        "mean_ms": 1392.9
+        "min_ms": 1106.0,
+        "p50_ms": 1145.0,
+        "p95_ms": 1270.0,
+        "p99_ms": 1270.0,
+        "max_ms": 1270.0,
+        "mean_ms": 1154.7
       },
-      "memory_peak_bytes_last_run": 61784064
+      "memory_peak_bytes_last_run": 62238720
     },
     "bash": {
       "all_runs_completed_with_expected_output": true,
-      "cold_total_ms": 733.4,
-      "cold_container_wall_ms": 474,
+      "cold_total_ms": 799.7,
+      "cold_container_wall_ms": 534,
       "warm_total": {
         "n": 30,
-        "min_ms": 718.8,
-        "p50_ms": 772.3,
-        "p95_ms": 1100.8,
-        "p99_ms": 1112.2,
-        "max_ms": 1112.2,
-        "mean_ms": 798.5
+        "min_ms": 727.3,
+        "p50_ms": 764.5,
+        "p95_ms": 862.7,
+        "p99_ms": 1024.7,
+        "max_ms": 1024.7,
+        "mean_ms": 782.8
       },
       "warm_container_wall": {
         "n": 30,
-        "min_ms": 460.0,
-        "p50_ms": 512.0,
-        "p95_ms": 695.0,
-        "p99_ms": 749.0,
-        "max_ms": 749.0,
-        "mean_ms": 526.6
+        "min_ms": 467.0,
+        "p50_ms": 498.0,
+        "p95_ms": 615.0,
+        "p99_ms": 647.0,
+        "max_ms": 647.0,
+        "mean_ms": 513.5
       },
       "memory_peak_bytes_last_run": 0
     },
     "ruby": {
       "all_runs_completed_with_expected_output": true,
-      "cold_total_ms": 850.3,
-      "cold_container_wall_ms": 560,
+      "cold_total_ms": 828.0,
+      "cold_container_wall_ms": 564,
       "warm_total": {
         "n": 30,
-        "min_ms": 678.0,
-        "p50_ms": 821.1,
-        "p95_ms": 5189.1,
-        "p99_ms": 8508.6,
-        "max_ms": 8508.6,
-        "mean_ms": 1311.4
+        "min_ms": 742.7,
+        "p50_ms": 790.8,
+        "p95_ms": 910.4,
+        "p99_ms": 1018.2,
+        "max_ms": 1018.2,
+        "mean_ms": 807.5
       },
       "warm_container_wall": {
         "n": 30,
-        "min_ms": 448.0,
-        "p50_ms": 526.0,
-        "p95_ms": 888.0,
-        "p99_ms": 7106.0,
-        "max_ms": 7106.0,
-        "mean_ms": 773.8
+        "min_ms": 488.0,
+        "p50_ms": 513.0,
+        "p95_ms": 619.0,
+        "p99_ms": 620.0,
+        "max_ms": 620.0,
+        "mean_ms": 527.1
       },
       "memory_peak_bytes_last_run": 0
     },
     "java": {
       "all_runs_completed_with_expected_output": true,
-      "cold_total_ms": 1836.1,
-      "cold_container_wall_ms": 1498,
+      "cold_total_ms": 1779.0,
+      "cold_container_wall_ms": 1499,
       "warm_total": {
         "n": 12,
-        "min_ms": 1359.1,
-        "p50_ms": 1449.1,
-        "p95_ms": 1904.6,
-        "p99_ms": 1904.6,
-        "max_ms": 1904.6,
-        "mean_ms": 1528.2
+        "min_ms": 1330.6,
+        "p50_ms": 1427.5,
+        "p95_ms": 1570.6,
+        "p99_ms": 1570.6,
+        "max_ms": 1570.6,
+        "mean_ms": 1429.4
       },
       "warm_container_wall": {
         "n": 12,
-        "min_ms": 1088.0,
-        "p50_ms": 1178.0,
-        "p95_ms": 1603.0,
-        "p99_ms": 1603.0,
-        "max_ms": 1603.0,
-        "mean_ms": 1246.2
+        "min_ms": 1080.0,
+        "p50_ms": 1152.0,
+        "p95_ms": 1314.0,
+        "p99_ms": 1314.0,
+        "max_ms": 1314.0,
+        "mean_ms": 1164.9
       },
-      "memory_peak_bytes_last_run": 40890368
+      "memory_peak_bytes_last_run": 40460288
     },
     "go": {
       "all_runs_completed_with_expected_output": true,
-      "cold_total_ms": 2251.7,
-      "cold_container_wall_ms": 1909,
+      "cold_total_ms": 2471.6,
+      "cold_container_wall_ms": 2178,
       "warm_total": {
         "n": 10,
-        "min_ms": 1244.8,
-        "p50_ms": 1338.0,
-        "p95_ms": 1966.8,
-        "p99_ms": 1966.8,
-        "max_ms": 1966.8,
-        "mean_ms": 1403.2
+        "min_ms": 1295.8,
+        "p50_ms": 1389.1,
+        "p95_ms": 1666.6,
+        "p99_ms": 1666.6,
+        "max_ms": 1666.6,
+        "mean_ms": 1416.6
       },
       "warm_container_wall": {
         "n": 10,
-        "min_ms": 981.0,
-        "p50_ms": 1034.0,
-        "p95_ms": 1473.0,
-        "p99_ms": 1473.0,
-        "max_ms": 1473.0,
-        "mean_ms": 1103.0
+        "min_ms": 1000.0,
+        "p50_ms": 1110.0,
+        "p95_ms": 1324.0,
+        "p99_ms": 1324.0,
+        "max_ms": 1324.0,
+        "mean_ms": 1120.0
       },
-      "memory_peak_bytes_last_run": 59834368
+      "memory_peak_bytes_last_run": 59592704
     },
     "rust": {
       "all_runs_completed_with_expected_output": true,
-      "cold_total_ms": 3281.1,
-      "cold_container_wall_ms": 2624,
+      "cold_total_ms": 2050.5,
+      "cold_container_wall_ms": 1725,
       "warm_total": {
         "n": 10,
-        "min_ms": 1209.9,
-        "p50_ms": 1287.6,
-        "p95_ms": 12605.4,
-        "p99_ms": 12605.4,
-        "max_ms": 12605.4,
-        "mean_ms": 2643.5
+        "min_ms": 901.0,
+        "p50_ms": 983.8,
+        "p95_ms": 1155.4,
+        "p99_ms": 1155.4,
+        "max_ms": 1155.4,
+        "mean_ms": 1004.1
       },
       "warm_container_wall": {
         "n": 10,
-        "min_ms": 956.0,
-        "p50_ms": 1020.0,
-        "p95_ms": 6775.0,
-        "p99_ms": 6775.0,
-        "max_ms": 6775.0,
-        "mean_ms": 1755.3
+        "min_ms": 636.0,
+        "p50_ms": 712.0,
+        "p95_ms": 863.0,
+        "p99_ms": 863.0,
+        "max_ms": 863.0,
+        "mean_ms": 729.1
       },
-      "memory_peak_bytes_last_run": 39796736
+      "memory_peak_bytes_last_run": 37961728
     }
   }
 }

@@ -23,6 +23,8 @@ def load(name: str) -> dict | None:
 def fmt(v: object) -> str:
     if v is None:
         return "-"
+    if isinstance(v, float) and abs(v) < 20:
+        return f"{v:,.2f}"
     return f"{v:,.0f}" if isinstance(v, int | float) else str(v)
 
 
@@ -223,8 +225,12 @@ def sections() -> dict[str, str]:
     if d := load("executor_latency"):
         out["ENV"] = env_line(d)
         out["LAT"] = latency_table(d)
+    if d := load("executor_latency_before_init"):
+        out["LAT_RUN1"] = latency_table(d)
     if d := load("sandbox_overhead"):
         out["OVH"] = overhead_table(d)
+    if d := load("sandbox_overhead_before_init"):
+        out["OVH_RUN1"] = overhead_table(d)
     if d := load("docker_cli_cost"):
         out["CLI"] = table(
             ["docker CLI call", "n", "p50 ms", "p95 ms"],
@@ -234,10 +240,11 @@ def sections() -> dict[str, str]:
         out["TIMEOUT_BEFORE"] = timeout_table(d)
     if d := load("timeout_accuracy"):
         out["TIMEOUT_AFTER"] = timeout_table(d)
-    if d := load("api_latency"):
-        out["API"] = api_table(d)
-    if d := load("api_throughput"):
-        out["THR"] = throughput_table(d)
+    for suffix, key in (("_run1", "RUN1"), ("_run2", "RUN2")):
+        if d := load(f"api_latency{suffix}"):
+            out[f"API_{key}"] = api_table(d)
+        if d := load(f"api_throughput{suffix}"):
+            out[f"THR_{key}"] = throughput_table(d)
     if d := load("idle_memory"):
         out["IDLE"] = table(["container", "MiB"], [[k, v] for k, v in d["results_mib"].items()])
     if d := load("security_and_integration"):

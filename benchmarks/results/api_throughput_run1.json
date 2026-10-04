@@ -1,0 +1,146 @@
+{
+  "benchmark": "api_throughput",
+  "definition": "closed loop: each of N threads repeatedly POSTs /v1/execute (python hello) for 20s. Latency = client wall time for completed requests. worker_concurrency=4.",
+  "stack": {
+    "worker_concurrency": 4
+  },
+  "environment": {
+    "date_utc": "2026-10-04T16:48:53+00:00",
+    "git_sha": "3af75e7",
+    "cpu_model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+    "cpu_count": 8,
+    "mem_total_mb": 5928,
+    "kernel": "6.18.40.1-microsoft-standard-WSL2",
+    "docker_server": "29.4.3",
+    "docker_cgroup": "2 systemd",
+    "python": "3.12.13",
+    "note": "shared WSL2 machine; other workloads may run concurrently (see README caveats)"
+  },
+  "results": {
+    "1": {
+      "client_threads": 1,
+      "duration_s": 21.7,
+      "completed": 15,
+      "errors": {
+        "non200": 0,
+        "exc": 0
+      },
+      "throughput_per_s": 0.69,
+      "latency": {
+        "n": 15,
+        "min_ms": 1014.5,
+        "p50_ms": 1322.4,
+        "p95_ms": 2259.7,
+        "p99_ms": 2259.7,
+        "max_ms": 2259.7,
+        "mean_ms": 1443.5
+      },
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 51.8,
+        "code-sandbox-worker-1": 80.5,
+        "code-sandbox-redis-1": 28.7,
+        "code-sandbox-minio-1": 306.6
+      }
+    },
+    "2": {
+      "client_threads": 2,
+      "duration_s": 21.7,
+      "completed": 22,
+      "errors": {
+        "non200": 0,
+        "exc": 0
+      },
+      "throughput_per_s": 1.02,
+      "latency": {
+        "n": 22,
+        "min_ms": 1215.4,
+        "p50_ms": 1834.6,
+        "p95_ms": 3457.8,
+        "p99_ms": 3560.4,
+        "max_ms": 3560.4,
+        "mean_ms": 1934.6
+      },
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 51.9,
+        "code-sandbox-worker-1": 111.7,
+        "code-sandbox-redis-1": 28.9,
+        "code-sandbox-minio-1": 306.7
+      }
+    },
+    "4": {
+      "client_threads": 4,
+      "duration_s": 27.9,
+      "completed": 22,
+      "errors": {
+        "non200": 0,
+        "exc": 0
+      },
+      "throughput_per_s": 0.79,
+      "latency": {
+        "n": 22,
+        "min_ms": 2686.1,
+        "p50_ms": 4502.3,
+        "p95_ms": 6649.7,
+        "p99_ms": 7974.2,
+        "max_ms": 7974.2,
+        "mean_ms": 4285.3
+      },
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 51.8,
+        "code-sandbox-worker-1": 143.8,
+        "code-sandbox-redis-1": 29.2,
+        "code-sandbox-minio-1": 306.7
+      }
+    },
+    "8": {
+      "client_threads": 8,
+      "duration_s": 28.4,
+      "completed": 12,
+      "errors": {
+        "non200": 8,
+        "exc": 0
+      },
+      "throughput_per_s": 0.42,
+      "latency": {
+        "n": 12,
+        "min_ms": 3036.1,
+        "p50_ms": 8946.6,
+        "p95_ms": 10879.8,
+        "p99_ms": 10879.8,
+        "max_ms": 10879.8,
+        "mean_ms": 7609.1
+      },
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 83.4,
+        "code-sandbox-worker-1": 159.3,
+        "code-sandbox-redis-1": 28.9,
+        "code-sandbox-minio-1": 305.8
+      }
+    },
+    "16": {
+      "client_threads": 16,
+      "duration_s": 26.8,
+      "completed": 56,
+      "errors": {
+        "non200": 0,
+        "exc": 0
+      },
+      "throughput_per_s": 2.09,
+      "latency": {
+        "n": 56,
+        "min_ms": 2501.7,
+        "p50_ms": 6995.6,
+        "p95_ms": 8560.8,
+        "p99_ms": 9628.5,
+        "max_ms": 9628.5,
+        "mean_ms": 6793.9
+      },
+      "peak_container_mem_mib": {
+        "code-sandbox-api-1": 57.4,
+        "code-sandbox-worker-1": 141.6,
+        "code-sandbox-redis-1": 27.7,
+        "code-sandbox-minio-1": 302.8
+      }
+    }
+  }
+}

@@ -78,6 +78,8 @@ def environment() -> dict[str, Any]:
             ["docker", "info", "--format", "{{.CgroupVersion}} {{.CgroupDriver}}"]
         ),
         "python": platform.python_version(),
+        "loadavg_1_5_15": " ".join(f"{x:.2f}" for x in os.getloadavg()),
+        "mem_available_mb": mem_available_mb(),
         "note": "shared WSL2 machine; other workloads may run concurrently (see README caveats)",
     }
 

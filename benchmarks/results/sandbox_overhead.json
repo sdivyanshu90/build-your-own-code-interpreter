@@ -2,8 +2,8 @@
   "benchmark": "sandbox_overhead",
   "definition": "bare = `docker run --rm -v code:/sandbox:ro image <interp> file` with Docker defaults (default bridge network, default seccomp, no limits); hardened_flags_only = the exact argv SandboxExecutor builds, run via a plain subprocess (no sampler, no stdin pump, no cleanup); full_executor = SandboxExecutor.execute. Runs are interleaved.",
   "environment": {
-    "date_utc": "2026-10-04T15:47:39+00:00",
-    "git_sha": "a09e3ed",
+    "date_utc": "2026-10-04T16:21:46+00:00",
+    "git_sha": "c529e08",
     "cpu_model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
     "cpu_count": 8,
     "mem_total_mb": 5928,
@@ -17,88 +17,88 @@
     "python": {
       "bare_docker_run": {
         "n": 20,
-        "min_ms": 973.1,
-        "p50_ms": 1581.0,
-        "p95_ms": 2183.3,
-        "p99_ms": 2301.9,
-        "max_ms": 2301.9,
-        "mean_ms": 1485.7
+        "min_ms": 537.5,
+        "p50_ms": 619.8,
+        "p95_ms": 733.0,
+        "p99_ms": 908.2,
+        "max_ms": 908.2,
+        "mean_ms": 636.1
       },
       "hardened_flags_only": {
         "n": 20,
-        "min_ms": 566.3,
-        "p50_ms": 1042.0,
-        "p95_ms": 1705.6,
-        "p99_ms": 2037.7,
-        "max_ms": 2037.7,
-        "mean_ms": 1216.4
+        "min_ms": 418.7,
+        "p50_ms": 497.6,
+        "p95_ms": 604.1,
+        "p99_ms": 751.8,
+        "max_ms": 751.8,
+        "mean_ms": 509.5
       },
       "full_executor": {
         "n": 20,
-        "min_ms": 1092.1,
-        "p50_ms": 1320.3,
-        "p95_ms": 1950.1,
-        "p99_ms": 2197.5,
-        "max_ms": 2197.5,
-        "mean_ms": 1472.9
+        "min_ms": 667.1,
+        "p50_ms": 756.6,
+        "p95_ms": 947.3,
+        "p99_ms": 1123.2,
+        "max_ms": 1123.2,
+        "mean_ms": 782.0
       }
     },
     "bash": {
       "bare_docker_run": {
         "n": 20,
-        "min_ms": 564.3,
-        "p50_ms": 629.8,
-        "p95_ms": 1840.6,
-        "p99_ms": 1861.4,
-        "max_ms": 1861.4,
-        "mean_ms": 1071.6
+        "min_ms": 569.1,
+        "p50_ms": 615.9,
+        "p95_ms": 713.0,
+        "p99_ms": 717.3,
+        "max_ms": 717.3,
+        "mean_ms": 626.8
       },
       "hardened_flags_only": {
         "n": 20,
-        "min_ms": 428.9,
-        "p50_ms": 508.0,
-        "p95_ms": 1533.6,
-        "p99_ms": 1872.7,
-        "max_ms": 1872.7,
-        "mean_ms": 928.2
+        "min_ms": 441.6,
+        "p50_ms": 483.9,
+        "p95_ms": 599.2,
+        "p99_ms": 828.4,
+        "max_ms": 828.4,
+        "mean_ms": 508.8
       },
       "full_executor": {
         "n": 20,
-        "min_ms": 636.5,
-        "p50_ms": 801.6,
-        "p95_ms": 1966.0,
-        "p99_ms": 2335.9,
-        "max_ms": 2335.9,
-        "mean_ms": 1165.0
+        "min_ms": 714.3,
+        "p50_ms": 791.1,
+        "p95_ms": 893.1,
+        "p99_ms": 1019.4,
+        "max_ms": 1019.4,
+        "mean_ms": 812.4
       }
     },
     "javascript": {
       "bare_docker_run": {
         "n": 20,
-        "min_ms": 626.6,
-        "p50_ms": 665.7,
-        "p95_ms": 834.1,
-        "p99_ms": 2629.2,
-        "max_ms": 2629.2,
-        "mean_ms": 773.3
+        "min_ms": 626.0,
+        "p50_ms": 681.5,
+        "p95_ms": 777.3,
+        "p99_ms": 786.2,
+        "max_ms": 786.2,
+        "mean_ms": 695.3
       },
       "hardened_flags_only": {
         "n": 20,
-        "min_ms": 482.2,
-        "p50_ms": 525.8,
-        "p95_ms": 595.8,
-        "p99_ms": 756.2,
-        "max_ms": 756.2,
-        "mean_ms": 543.1
+        "min_ms": 494.1,
+        "p50_ms": 571.1,
+        "p95_ms": 700.0,
+        "p99_ms": 747.6,
+        "max_ms": 747.6,
+        "mean_ms": 580.9
       },
       "full_executor": {
         "n": 20,
-        "min_ms": 783.5,
-        "p50_ms": 829.6,
-        "p95_ms": 1047.7,
-        "p99_ms": 1059.4,
-        "max_ms": 1059.4,
-        "mean_ms": 856.7
+        "min_ms": 779.7,
+        "p50_ms": 874.6,
+        "p95_ms": 1411.3,
+        "p99_ms": 1913.3,
+        "max_ms": 1913.3,
+        "mean_ms": 963.0
       }
     }
   }

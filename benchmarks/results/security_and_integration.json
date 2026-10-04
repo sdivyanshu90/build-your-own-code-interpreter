@@ -2,8 +2,8 @@
   "benchmark": "security_and_integration",
   "definition": "pytest tests/security tests/integration -m integration against real containers; each escape payload prints ESCAPED only if it succeeded.",
   "environment": {
-    "date_utc": "2026-10-04T15:40:43+00:00",
-    "git_sha": "5ca442f",
+    "date_utc": "2026-10-04T16:27:11+00:00",
+    "git_sha": "c529e08",
     "cpu_model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
     "cpu_count": 8,
     "mem_total_mb": 5928,
@@ -14,257 +14,307 @@
     "note": "shared WSL2 machine; other workloads may run concurrently (see README caveats)"
   },
   "counts": {
-    "passed": 49,
-    "failed": 0,
+    "passed": 58,
+    "failed": 1,
     "error": 0,
     "skipped": 0
   },
-  "pytest_returncode": 0,
+  "pytest_returncode": 1,
   "cases": [
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[read_etc_shadow]",
       "outcome": "passed",
-      "time_s": 4.272
+      "time_s": 2.28
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[read_host_proc_init]",
       "outcome": "passed",
-      "time_s": 2.479
+      "time_s": 0.832
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[write_etc_hosts]",
       "outcome": "passed",
-      "time_s": 6.468
+      "time_s": 0.842
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[write_root_dir]",
       "outcome": "passed",
-      "time_s": 4.949
+      "time_s": 0.853
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[chroot_escape]",
       "outcome": "passed",
-      "time_s": 1.796
+      "time_s": 0.836
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[symlink_attack]",
       "outcome": "passed",
-      "time_s": 3.71
+      "time_s": 0.788
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[exec_from_tmp_noexec]",
       "outcome": "passed",
-      "time_s": 1.768
+      "time_s": 0.801
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[tcp_connect_external]",
       "outcome": "passed",
-      "time_s": 2.018
+      "time_s": 0.913
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[udp_send]",
       "outcome": "passed",
-      "time_s": 2.022
+      "time_s": 0.882
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[http_request]",
       "outcome": "passed",
-      "time_s": 2.279
+      "time_s": 1.34
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[dns_lookup]",
       "outcome": "passed",
-      "time_s": 1.87
+      "time_s": 0.951
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[setuid_to_root]",
       "outcome": "passed",
-      "time_s": 1.605
+      "time_s": 0.849
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[ptrace_self]",
       "outcome": "passed",
-      "time_s": 1.669
+      "time_s": 0.847
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[load_kernel_module]",
       "outcome": "passed",
-      "time_s": 1.785
+      "time_s": 0.8
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[write_sysfs]",
       "outcome": "passed",
-      "time_s": 1.811
+      "time_s": 0.956
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[fork_bomb]",
       "outcome": "passed",
-      "time_s": 1.754
+      "time_s": 0.958
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[memory_bomb]",
       "outcome": "passed",
-      "time_s": 3.075
+      "time_s": 4.625
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[disk_fill]",
       "outcome": "passed",
-      "time_s": 2.265
+      "time_s": 0.982
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[cpu_fork_spin]",
       "outcome": "passed",
-      "time_s": 3.071
+      "time_s": 1.974
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[docker_socket_access]",
       "outcome": "passed",
-      "time_s": 0.764
+      "time_s": 0.727
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[namespace_read_host]",
       "outcome": "passed",
-      "time_s": 0.821
+      "time_s": 0.846
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[cgroup_release_agent]",
       "outcome": "passed",
-      "time_s": 0.741
+      "time_s": 0.802
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[mount_proc]",
       "outcome": "passed",
-      "time_s": 0.735
+      "time_s": 0.907
     },
     {
       "name": "tests.security.test_escape_attempts::test_escape_attempt_is_blocked[unshare_userns]",
       "outcome": "passed",
-      "time_s": 0.806
+      "time_s": 0.738
     },
     {
       "name": "tests.security.test_escape_attempts::test_system_stays_responsive_after_attacks",
       "outcome": "passed",
-      "time_s": 5.737
+      "time_s": 4.804
+    },
+    {
+      "name": "tests.security.test_seccomp_enforced::test_allowlist_profile_denies_syscall_with_eperm[unshare_newuser]",
+      "outcome": "passed",
+      "time_s": 0.895
+    },
+    {
+      "name": "tests.security.test_seccomp_enforced::test_allowlist_profile_denies_syscall_with_eperm[io_uring_setup]",
+      "outcome": "passed",
+      "time_s": 0.974
+    },
+    {
+      "name": "tests.security.test_seccomp_enforced::test_allowlist_profile_denies_syscall_with_eperm[userfaultfd]",
+      "outcome": "passed",
+      "time_s": 1.048
+    },
+    {
+      "name": "tests.security.test_seccomp_enforced::test_allowlist_profile_denies_syscall_with_eperm[perf_event_open]",
+      "outcome": "passed",
+      "time_s": 1.213
+    },
+    {
+      "name": "tests.security.test_seccomp_enforced::test_allowlist_profile_denies_syscall_with_eperm[keyctl]",
+      "outcome": "passed",
+      "time_s": 0.993
+    },
+    {
+      "name": "tests.security.test_seccomp_enforced::test_allowlist_profile_denies_syscall_with_eperm[ptrace_traceme]",
+      "outcome": "passed",
+      "time_s": 0.902
+    },
+    {
+      "name": "tests.security.test_seccomp_enforced::test_blocklist_profile_denies_syscall_with_eperm[unshare_newuser]",
+      "outcome": "passed",
+      "time_s": 1.532
+    },
+    {
+      "name": "tests.security.test_seccomp_enforced::test_blocklist_profile_denies_syscall_with_eperm[io_uring_setup]",
+      "outcome": "passed",
+      "time_s": 1.395
+    },
+    {
+      "name": "tests.security.test_seccomp_enforced::test_blocklist_profile_denies_syscall_with_eperm[userfaultfd]",
+      "outcome": "passed",
+      "time_s": 1.252
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_python_print_hello_world",
       "outcome": "passed",
-      "time_s": 0.96
+      "time_s": 0.853
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_python_3_12_f_strings_work",
       "outcome": "passed",
-      "time_s": 0.9
+      "time_s": 0.872
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_javascript_node_20_async_await",
       "outcome": "passed",
-      "time_s": 1.098
+      "time_s": 1.346
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_typescript_compiled_and_run",
       "outcome": "passed",
-      "time_s": 1.712
+      "time_s": 1.58
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_java_21_records_work",
       "outcome": "passed",
-      "time_s": 2.288
+      "time_s": 1.776
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_go_1_22_generics_work",
       "outcome": "passed",
-      "time_s": 2.399
+      "time_s": 1.32
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_ruby_3_3_hello_world",
       "outcome": "passed",
-      "time_s": 1.102
+      "time_s": 1.048
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_rust_hello_world_compiled",
       "outcome": "passed",
-      "time_s": 4.202
+      "time_s": 1.133
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_bash_echo_hello_world",
       "outcome": "passed",
-      "time_s": 0.866
+      "time_s": 0.784
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_python_cannot_connect_to_internet",
       "outcome": "passed",
-      "time_s": 1.034
+      "time_s": 0.907
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_python_cannot_read_host_proc",
-      "outcome": "passed",
-      "time_s": 0.835
+      "outcome": "failed",
+      "time_s": 0.903
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_python_cannot_read_etc_shadow",
       "outcome": "passed",
-      "time_s": 0.92
+      "time_s": 0.756
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_python_fork_bomb_killed_within_timeout",
       "outcome": "passed",
-      "time_s": 10.807
+      "time_s": 5.972
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_javascript_infinite_loop_times_out",
       "outcome": "passed",
-      "time_s": 3.704
+      "time_s": 3.595
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_bash_cannot_call_wget",
       "outcome": "passed",
-      "time_s": 0.782
+      "time_s": 0.904
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_java_cannot_open_socket",
       "outcome": "passed",
-      "time_s": 1.826
+      "time_s": 3.036
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_python_oom_killed_correctly",
       "outcome": "passed",
-      "time_s": 1.531
+      "time_s": 4.043
+    },
+    {
+      "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_sigterm_reaches_a_program_without_a_handler",
+      "outcome": "passed",
+      "time_s": 1.903
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_container_is_not_present_after_execution",
       "outcome": "passed",
-      "time_s": 1.159
+      "time_s": 1.602
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestRealDockerExecution::test_temp_files_cleaned_up_on_host",
       "outcome": "passed",
-      "time_s": 0.775
+      "time_s": 1.309
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestQueueWorkerIntegration::test_job_submitted_to_redis_stream_and_consumed",
       "outcome": "passed",
-      "time_s": 0.04
+      "time_s": 0.079
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestQueueWorkerIntegration::test_result_stored_in_redis_and_retrievable",
       "outcome": "passed",
-      "time_s": 0.018
+      "time_s": 0.031
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestQueueWorkerIntegration::test_multiple_concurrent_jobs_execute_independently",
       "outcome": "passed",
-      "time_s": 1.855
+      "time_s": 3.014
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestQueueWorkerIntegration::test_worker_recovers_stale_job_from_another_dead_worker",
       "outcome": "passed",
-      "time_s": 0.01
+      "time_s": 0.025
     },
     {
       "name": "tests.integration.test_executor_real_docker.TestQueueWorkerIntegration::test_job_cancellation_kills_running_container",
       "outcome": "passed",
-      "time_s": 1.508
+      "time_s": 1.838
     }
   ]
 }

@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import http.client
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -162,6 +163,7 @@ def cmd_latency(args: argparse.Namespace) -> None:
             "sync": summarize(sync_ms),
             "async_poll_20ms": summarize(async_ms),
             "non_completed": bad,
+            "loadavg1_end": round(os.getloadavg()[0], 2),
         }
         print(
             f"{lang:11s} sync p50={out[lang]['sync']['p50_ms']}ms "  # type: ignore[index]
@@ -169,7 +171,7 @@ def cmd_latency(args: argparse.Namespace) -> None:
             flush=True,
         )  # type: ignore[index]
     write_json(
-        "api_latency",
+        f"api_latency{args.tag}",
         {
             "benchmark": "api_latency",
             "definition": "client-side wall time, one request at a time, single keep-alive "
@@ -181,7 +183,9 @@ def cmd_latency(args: argparse.Namespace) -> None:
             "results": out,
         },
     )
-    write_csv("api_latency_raw", ["language", "mode", "i", "latency_ms", "http_status"], raw)
+    write_csv(
+        f"api_latency{args.tag}_raw", ["language", "mode", "i", "latency_ms", "http_status"], raw
+    )
 
 
 def cmd_throughput(args: argparse.Namespace) -> None:
@@ -231,6 +235,7 @@ def cmd_throughput(args: argparse.Namespace) -> None:
 
         sampler_thread = threading.Thread(target=sampler, daemon=True)
         sampler_thread.start()
+        load_start = os.getloadavg()[0]
         started = time.perf_counter()
         with ThreadPoolExecutor(max_workers=conc) as pool:
             list(pool.map(worker, range(conc)))
@@ -244,6 +249,7 @@ def cmd_throughput(args: argparse.Namespace) -> None:
             "errors": errors,
             "throughput_per_s": round(len(lat) / elapsed, 2),
             "latency": summarize(lat),
+            "loadavg1_start_end": [round(load_start, 2), round(os.getloadavg()[0], 2)],
             "peak_container_mem_mib": peak,
         }
         print(
@@ -253,7 +259,7 @@ def cmd_throughput(args: argparse.Namespace) -> None:
         )  # type: ignore[index,union-attr]
         time.sleep(3)
     write_json(
-        "api_throughput",
+        f"api_throughput{args.tag}",
         {
             "benchmark": "api_throughput",
             "definition": f"closed loop: each of N threads repeatedly POSTs /v1/execute "
@@ -264,7 +270,7 @@ def cmd_throughput(args: argparse.Namespace) -> None:
             "results": out,
         },
     )
-    write_csv("api_throughput_raw", ["client_threads", "latency_ms"], raw)
+    write_csv(f"api_throughput{args.tag}_raw", ["client_threads", "latency_ms"], raw)
 
 
 def cmd_idle_memory(args: argparse.Namespace) -> None:
@@ -290,6 +296,7 @@ def main() -> None:
     parser.add_argument("--secret", default=DEFAULT_SECRET)
     parser.add_argument("--worker-concurrency", type=int, default=4)
     parser.add_argument("--min-mem-mb", type=int, default=1200)
+    parser.add_argument("--tag", default="", help="suffix for result file names, e.g. _run2")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("latency")
     p.add_argument("--languages", nargs="*")
