@@ -6,6 +6,7 @@
  * `Principal` or throws an `AuthError`. Anonymous access is permitted only when explicitly
  * enabled in config.
  */
+import { createHash } from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { getConfig } from '../config.js';
 import { verifyJwt, JwtError } from '../services/jwt.js';
@@ -91,14 +92,13 @@ export function authenticatePrincipal(headers: HeaderBag, queryToken?: string): 
   );
 }
 
-/** Non-cryptographic short fingerprint of an API key for use as a stable user id. */
+/**
+ * Short, stable fingerprint of an API key used as the user id. SHA-256 (truncated to 64 bits) so
+ * two distinct keys cannot realistically collide into one identity (shared quota, shared jobs),
+ * and the raw key is never stored in Redis keys or job records.
+ */
 function hashKey(key: string): string {
-  let h = 2166136261;
-  for (let i = 0; i < key.length; i += 1) {
-    h ^= key.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0).toString(16);
+  return createHash('sha256').update(key).digest('hex').slice(0, 16);
 }
 
 /** Express middleware that attaches `req.principal` or returns an RFC 7807 error. */

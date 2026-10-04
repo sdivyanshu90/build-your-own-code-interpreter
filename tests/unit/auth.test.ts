@@ -78,3 +78,23 @@ describe('authenticatePrincipal', () => {
     expect(p.auth_method).toBe('anonymous');
   });
 });
+
+describe('API key identity', () => {
+  beforeEach(() => {
+    process.env.API_KEYS = 'svc-key:premium,ci-key:authenticated';
+    resetConfigForTests();
+  });
+  afterEach(() => {
+    delete process.env.API_KEYS;
+    resetConfigForTests();
+  });
+
+  it('derives a stable, distinct, non-reversible user id per key', () => {
+    const a = authenticatePrincipal(bag({ 'x-api-key': 'svc-key' }));
+    const b = authenticatePrincipal(bag({ 'x-api-key': 'ci-key' }));
+    expect(a.user_id).toMatch(/^key:[0-9a-f]{16}$/);
+    expect(a.user_id).not.toBe(b.user_id);
+    expect(authenticatePrincipal(bag({ 'x-api-key': 'svc-key' })).user_id).toBe(a.user_id);
+    expect(a.user_id).not.toContain('svc-key');
+  });
+});
