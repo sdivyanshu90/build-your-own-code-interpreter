@@ -18,6 +18,16 @@ describe('loadConfig', () => {
     expect(cfg.CORS_ORIGINS).toEqual(['http://localhost:3000']);
   });
 
+  it('accepts the worker-style host:port MINIO_ENDPOINT used by docker-compose', () => {
+    // Regression: the MinIO JS client throws "Invalid endPoint" for "minio:9000".
+    const cfg = loadConfig({ ...VALID, MINIO_ENDPOINT: 'minio:9100' } as NodeJS.ProcessEnv);
+    expect(cfg.MINIO_ENDPOINT).toBe('minio');
+    expect(cfg.MINIO_PORT).toBe(9100);
+    const bare = loadConfig({ ...VALID, MINIO_PORT: '9001' } as NodeJS.ProcessEnv);
+    expect(bare.MINIO_ENDPOINT).toBe('localhost');
+    expect(bare.MINIO_PORT).toBe(9001);
+  });
+
   it('throws when REDIS_URL is missing', () => {
     const { REDIS_URL: _omit, ...env } = VALID;
     expect(() => loadConfig(env as NodeJS.ProcessEnv)).toThrow(/REDIS_URL/);
