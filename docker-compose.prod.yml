@@ -8,7 +8,9 @@ name: code-sandbox
 
 services:
   redis:
-    ports: []
+    # `!reset` is required: a plain `ports: []` is *merged* with the base file's list and would
+    # leave 6379 published on the host.
+    ports: !reset []
     command:
       - "redis-server"
       - "--appendonly"
@@ -25,8 +27,7 @@ services:
           memory: 1280m
 
   minio:
-    ports:
-      - "9001:9001"
+    ports: !reset []
     deploy:
       resources:
         limits:

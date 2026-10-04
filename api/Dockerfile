@@ -6,9 +6,9 @@
 FROM node:20.18.1-alpine AS builder
 WORKDIR /app
 
-# Install deps with a clean, reproducible lockfile-driven install.
-COPY package.json ./
-RUN npm install --no-audit --no-fund
+# Install deps with a clean, reproducible lockfile-driven install (`npm ci` fails on drift).
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 COPY tsconfig.json ./
 COPY src ./src
