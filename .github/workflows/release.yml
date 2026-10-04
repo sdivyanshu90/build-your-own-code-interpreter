@@ -64,7 +64,7 @@ jobs:
             curl -sf http://localhost:8080/v1/health && break || sleep 2;
           done
       - name: Run the e2e suite
-        run: npx vitest run --config ../tests/e2e/vitest.e2e.config.ts
+        run: npx vitest run --config vitest.e2e.config.ts
         working-directory: api
         env:
           API_BASE_URL: http://localhost:8080
