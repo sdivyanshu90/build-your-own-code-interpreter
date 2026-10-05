@@ -139,6 +139,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     apiKeyMap.set(key, tier === 'premium' ? 'premium' : 'authenticated');
   }
 
+  // The worker and docker-compose use `host:port` for MINIO_ENDPOINT; the MinIO JS client wants a
+  // bare host plus a separate port and throws "Invalid endPoint" otherwise (which made
+  // /v1/health report MinIO as down in the default compose stack). Accept both forms.
+  const hostPort = /^([^:/]+):(\d{1,5})$/.exec(data.MINIO_ENDPOINT);
+  if (hostPort) {
+    data.MINIO_ENDPOINT = hostPort[1] as string;
+    data.MINIO_PORT = Number(hostPort[2]);
+  }
+
   return {
     ...data,
     CORS_ORIGINS: csvToArray(data.CORS_ORIGINS),

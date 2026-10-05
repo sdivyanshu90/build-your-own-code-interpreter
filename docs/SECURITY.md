@@ -6,6 +6,12 @@ single-use Docker containers. It is written for two audiences: engineers running
 service in production, and reviewers who need to understand exactly what the sandbox
 does and does not guarantee.
 
+> **Accuracy note (code audit).** Layers 7 and 8 below, and several items in section 6, describe
+> hardening that is *optional or not implemented by this repository* (user-namespace remapping,
+> digest pinning, cosign verification, gVisor, a socket proxy). The authoritative, code-verified
+> status of every claim is in [THREAT_MODEL.md](THREAT_MODEL.md#5-implementation-status-of-controls-claimed-elsewhere)
+> and [SANDBOX.md](SANDBOX.md). Where this file and those disagree, trust those.
+
 The guiding assumption throughout is simple and absolute:
 
 > **Everything that runs inside a sandbox container is hostile.**
@@ -45,14 +51,14 @@ still leaves the others standing.
 
 | # | Door | What it does in plain English |
 |---|------|-------------------------------|
-| 1 | **Linux namespaces** (PID/NET/MNT/UTS/IPC/USER) | The container gets its own private view of processes, network, filesystem mounts, hostname, IPC, and user IDs. It cannot see or signal anything on the host. |
-| 2 | **Filesystem** | The root filesystem is read-only. The only writable space is a 64 MB in-memory `/tmp` that is mounted `noexec` (you cannot run a program from it). The only thing mounted from outside is the per-job code directory, mounted **read-only** at `/sandbox`. No host directories are bind-mounted. |
+| 1 | **Linux namespaces** (PID/NET/MNT/UTS/IPC; USER only if the daemon enables remapping) | The container gets its own private view of processes, network, filesystem mounts, hostname and IPC. It cannot see or signal anything on the host. |
+| 2 | **Filesystem** | The root filesystem is read-only. The only writable space is an in-memory `/tmp` (32-256 MB depending on language) mounted `noexec`; compiled languages also get an executable `/build` tmpfs. The only thing mounted from outside is the per-job code directory, mounted **read-only** at `/sandbox`. No other host directories are bind-mounted. |
 | 3 | **Network** | By default the container has *no network at all* (`--network none`). It cannot reach the internet, the host, the cloud metadata service, or any internal service. |
-| 4 | **Seccomp** | A kernel-level allowlist of system calls. Anything not explicitly permitted is blocked with an error. The default is *deny everything*. |
+| 4 | **Seccomp** | A kernel-level syscall filter. For Python, JavaScript, Java, Ruby and Bash it is an allow-list (default *deny*); for TypeScript, Go and Rust it is a block-list of escape primitives (default allow) because their toolchains need a broad syscall set. |
 | 5 | **Capability dropping** | Every Linux "superpower" (capability) is removed. The process cannot do anything that requires elevated privilege, even in theory. |
 | 6 | **Cgroups (resource limits)** | Hard caps on memory, CPU, process count, open files, and disk so a single job cannot starve the host. |
-| 7 | **User namespace remapping** | The container runs as `nobody` (uid 65534), and with user-namespace remapping that maps to an unprivileged user on the host. "Root in the container" is not root on the host. |
-| 8 | **Immutable infrastructure** | Runtime images are pinned by SHA-256 digest and verified before every run. No software is installed at runtime, so there is no opportunity to pull in a malicious package. |
+| 7 | **Non-root user** (+ optional user-namespace remapping) | The container runs as `nobody` (uid 65534). *If* the Docker daemon is configured with `userns-remap` (not done by this repo) that maps to an unprivileged high uid on the host; otherwise it is host uid 65534. |
+| 8 | **Immutable infrastructure** | Runtime images are pinned by version tag in the Dockerfiles; digest pinning with a pre-run check is available via `SANDBOX_DIGEST_<LANG>` (off by default, works only for registry-pulled images). No software is installed at runtime and there is no network, so there is no way to pull in a package. |
 
 If you remember one thing: **the container starts with nothing and is granted only the
 bare minimum to run one program once.**
@@ -148,18 +154,21 @@ host-visible pseudo-filesystems.
 
 **The Docker socket is never mounted into a sandbox container.** A container with the
 Docker socket is equivalent to root on the host; we never grant it. The worker reaches
-Docker via the host daemon socket *outside* the sandbox boundary. In production this is
-further hardened (see §6): rootless Docker, a socket-proxy with a least-privilege API
-allowlist, or the gVisor (`runsc`) runtime for a second kernel boundary.
+Docker via the host daemon socket *outside* the sandbox boundary: the **raw socket is
+mounted into the worker container**, which therefore holds root-equivalent power over the host.
+Possible further hardening (see §6, **not provided by this repository**): rootless Docker, a
+socket proxy with a least-privilege API allow-list, or the gVisor (`runsc`) runtime.
 
 ### Dependency-confusion / supply-chain
 
 - **No runtime package installs.** Images are built ahead of time and frozen; there is no
   `pip install` / `npm install` at execution time, so there is no dependency-confusion
   window.
-- Images are **pinned and verified by SHA-256 digest** before every run
-  (`_verify_image` in `executor.py` raises `ImageIntegrityError` on mismatch). In
-  production images should also be cosign-signed and verified.
+- Digest pinning is **optional**: when `SANDBOX_DIGEST_<LANG>` is set, `_verify_image` in
+  `executor.py` checks it against `RepoDigests` before every run and raises
+  `ImageIntegrityError` on mismatch. It is off by default and cannot work for locally built
+  images (no `RepoDigests`). `release.yml` cosign-signs the API and worker images only; nothing
+  verifies signatures at run time.
 - Runtime entrypoints are locked down (e.g. Python runs with `-I -B` for isolated mode;
   Ruby with `--disable-gems`).
 
@@ -177,8 +186,9 @@ evaluated.
 - The `JWT_SECRET` is validated at startup (`api/src/config.ts`): it must be **≥ 32
   characters** and must not be a known-weak placeholder (`secret`, `changeme`, `password`,
   …). The process refuses to boot otherwise.
-- API keys are matched against a configured map and surfaced only as a hashed fingerprint
-  in the principal id.
+- API keys are matched against a configured map (plaintext in `API_KEYS`; lookup is not
+  constant-time) and surfaced only as a truncated SHA-256 fingerprint in the principal id
+  (this branch replaced a 32-bit FNV hash that could collide across keys).
 - Anonymous access is permitted **only** when `ALLOW_ANONYMOUS=true` is explicitly set.
 
 ### Code injection via filenames / argv
@@ -192,11 +202,14 @@ can never be overridden by the user (`_FORBIDDEN_ENV`).
 
 ### Seccomp design detail
 
-- Default action: `SCMP_ACT_ERRNO` (**default-deny** — unknown syscalls fail with an
-  errno rather than executing).
-- Per-language allowlists: `COMMON_SYSCALLS` (~219 calls) for interpreted/compiled
-  languages, plus small per-language extras; `BASH_SYSCALLS` (~81 calls) makes **bash the
-  most restrictive** profile.
+- Python, JavaScript, Java, Ruby, Bash: default action `SCMP_ACT_ERRNO` (**default-deny**,
+  unknown syscalls fail with an errno rather than executing) with the `COMMON_SYSCALLS` allow-list
+  (219 names in the generated Python and Bash profiles) plus small per-language extras. There is
+  no separate Bash list: Bash uses the common set (an earlier version of this file mentioned a
+  `BASH_SYSCALLS` set that does not exist in the code).
+- TypeScript, Go, Rust: default-**allow** with `DANGEROUS_SYSCALLS` denied (`EPERM`), `clone3`
+  `ENOSYS`, and one deny rule per `CLONE_NEW*` flag, because the toolchains need a broad syscall
+  surface (see [ADR-004](DESIGN_DECISIONS.md#adr-004-block-list-seccomp-for-toolchain-runtimes)).
 - `DANGEROUS_SYSCALLS` is **subtracted from every profile** defensively — those calls can
   never be allow-listed, even by mistake in a future edit.
 - `clone` is allowed only with a **masked-argument rule** that forbids the

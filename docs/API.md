@@ -46,7 +46,9 @@ print(sign("your-strong-jwt-secret-at-least-32-chars", "user-123"))
   "language": "python",          // one of: python javascript typescript java go ruby rust bash
   "code": "print('hello')",      // required, 1..MAX_CODE_SIZE_BYTES (default 256 KiB)
   "stdin": "",                   // optional, ..MAX_STDIN_BYTES
-  "timeout_seconds": 10,         // optional, clamped to [1, MAX_TIMEOUT_SECONDS] (default 30)
+  "timeout_seconds": 10,         // optional positive int; default DEFAULT_TIMEOUT_SECONDS (10);
+                                 // clamped to MAX_TIMEOUT_SECONDS (30), then again by the worker to
+                                 // the language ceiling (python 10 s ... rust 25 s)
   "env_vars": { "KEY": "VALUE" },// optional; dangerous names (PATH, LD_*, …) are stripped
   "files": [                     // optional read-only files mounted next to the code
     { "name": "data.csv", "content": "1,2,3" }   // names are sanitised to a safe basename
@@ -69,7 +71,7 @@ print(sign("your-strong-jwt-secret-at-least-32-chars", "user-123"))
   "oom_killed": false,
   "timed_out": false,
   "truncated": false,            // true if output hit output_max_bytes (default 1 MiB)
-  "files": []                    // produced artifacts (presigned URLs), if any
+  "files": []                    // reserved for produced artifacts; currently always empty
 }
 ```
 
@@ -88,9 +90,9 @@ Runs the code and blocks (long-poll) until it finishes or the synchronous window
 - **Auth:** required. **Rate limit:** per tier.
 - **Request:** an `ExecutionRequest`.
 - **`200`** → an `ExecutionResult`.
-- **Errors:** `400` validation, `401` unauthenticated, `403` forbidden/invalid token, `408`
-  execution exceeded the sync window (use the async endpoint), `429` rate or concurrency limit,
-  `503` backend unavailable.
+- **Errors:** `400` validation or malformed JSON, `401` no credentials, `403` invalid token /
+  unknown API key, `408` execution exceeded the sync window (the job keeps running; the body has
+  `job_id`), `413` body too large, `429` rate or concurrency limit, `503` Redis unavailable.
 
 ```bash
 curl -s -X POST http://localhost:8080/v1/execute \
@@ -150,7 +152,9 @@ def run_async(req):
 
 ### `DELETE /v1/jobs/{job_id}` — cancel
 
-Cancels a `PENDING` job or kills a `RUNNING` one (SIGKILLs the container).
+Cancels a `PENDING` job (skipped when dequeued) or kills a `RUNNING` one (the worker polls the
+cancel flag every 0.5 s, then sends SIGTERM, waits `SIGTERM_GRACE_SECONDS`, then SIGKILL). The
+record is rewritten to `KILLED` immediately; the worker later stores the authoritative result.
 
 - **`200`** → `{ "job_id": "01J...", "status": "KILLED" }`.
 - **Errors:** `403`, `404`, `409` (already terminal).
@@ -191,6 +195,9 @@ Real-time stdout/stderr streaming.
 - **Upgrade auth:** `Authorization`/`X-API-Key` header, or `?token=<jwt>` query param for browser
   clients that cannot set headers. A failed auth is rejected with `401` before the WS handshake.
 - **Liveness:** server pings every 15 s; a connection missing two pongs is closed.
+- **Limits:** the stream path applies the same per-user rate limit and concurrency quota as
+  `POST /v1/execute` (error frames titled `Too Many Requests` / `Concurrency Limit`). Hard stream
+  lifetime 120 s; max inbound frame 1 MiB.
 - **Backpressure:** if the client cannot keep up (send buffer over the high-water mark), the server
   sends an `error` frame and closes.
 
@@ -245,15 +252,19 @@ All errors are `application/problem+json`:
 |--------|--------|-------|-----------|
 | 400 | `validation-error` | Unknown language, empty/oversized code, bad timeout, unsafe filename, oversized env value. | Inspect `errors[]`; fix the offending field. |
 | 400 | _(invalid job id)_ | Job id is not a valid ULID. | Use the `job_id` returned by submit. |
-| 401 | `unauthenticated` | No/badly-formed credentials and anonymous disabled. | Send a Bearer JWT or `X-API-Key`. |
-| 403 | `forbidden` | Invalid token, unknown API key, or job owned by another user. | Re-authenticate; only access your own jobs. |
-| 404 | `not-found` | Unknown job id or route. | Verify the id; it may have expired (results TTL ≈ 1h). |
+| 401 | _(type slug only)_ `unauthenticated` | No credentials and anonymous disabled. | Send a Bearer JWT or `X-API-Key`. |
+| 403 | _(type slug only)_ `forbidden` | Invalid token (bad signature, expired, missing `sub`), unknown API key, or job owned by another user. | Re-authenticate; only access your own jobs. |
+| 404 | _(type slug only)_ `not-found` | Unknown job id or route. | Verify the id; records expire after 2 h. |
 | 408 | `sync-timeout` | Sync execution exceeded the server window. | Use `POST /v1/execute/async` and poll. |
 | 409 | `already-terminal` | Cancelling a job that already finished. | Nothing to do. |
 | 429 | `rate-limited` | Per-tier request rate exceeded. | Honour the `Retry-After` header; back off. |
 | 429 | `concurrency-limit` | Too many concurrent jobs for your tier. | Wait for in-flight jobs to finish. |
-| 503 | `service-unavailable` | Redis/Docker unavailable (circuit breaker open). | Retry with backoff; check `/v1/health`. |
-| 500 | `internal-error` | Unexpected server error (details are logged, not returned). | Retry; report with the `x-request-id` header. |
+| 503 | `service-unavailable` | Redis unreachable or the Redis circuit breaker is open (`Retry-After: 5`). Docker problems do **not** surface here: the job stays pending/running and eventually becomes `FAILED`. | Retry with backoff; check `/v1/health`. |
+| 400/413 | `validation-error` | Malformed JSON or body larger than `MAX_CODE_SIZE + MAX_STDIN + 64 KiB`. | Fix the payload. |
+| 500 | _(type slug only)_ `internal-error` | Unexpected server error (details are logged, not returned). | Retry; report with the `x-request-id` header. |
+
+Only errors raised with an explicit `code` carry a `code` property in the body; for the others the
+last path segment of `type` is the stable identifier.
 
 Rate-limited responses include `Retry-After` (seconds) and `RateLimit-Limit` / `RateLimit-Remaining`.
 
@@ -273,3 +284,217 @@ Rate-limited responses include `Retry-After` (seconds) and `RateLimit-Limit` / `
 | `bash` | Bash | 5.2 | 10 s | 128 MB |
 
 See [`ADDING_LANGUAGE.md`](./ADDING_LANGUAGE.md) to add more.
+
+---
+
+## Captured examples
+
+Real responses from the benchmark stack (commit recorded in
+`benchmarks/results/smoke_examples.json`, produced by `benchmarks/smoke_examples.py`, 2026-10-04).
+Job ids and timings vary per run; the shapes do not.
+
+**sync python** - `POST /v1/execute {"language":"python","code":"print(6*7)"}` -> `200`
+
+```json
+{
+  "job_id": "01M43W5Z4EF3D0TCC8HB6FXS3H",
+  "status": "COMPLETED",
+  "stdout": "42\n",
+  "stderr": "",
+  "exit_code": 0,
+  "wall_time_ms": 1017,
+  "cpu_time_ms": 100,
+  "memory_bytes": 13856768,
+  "oom_killed": false,
+  "timed_out": false,
+  "truncated": false,
+  "files": []
+}
+```
+**nonzero exit** - `POST /v1/execute` with `import sys; print("x"); sys.exit(3)` - a non-zero exit is still `COMPLETED` -> `200`
+
+```json
+{
+  "job_id": "01M43W61FSXJX11F3V9EWZFW4G",
+  "status": "COMPLETED",
+  "stdout": "x\n",
+  "stderr": "",
+  "exit_code": 3,
+  "wall_time_ms": 729,
+  "cpu_time_ms": 114,
+  "memory_bytes": 5124096,
+  "oom_killed": false,
+  "timed_out": false,
+  "truncated": false,
+  "files": []
+}
+```
+**syntax error** - `POST /v1/execute` with `def (` - interpreter errors arrive on `stderr` with `COMPLETED` -> `200`
+
+```json
+{
+  "job_id": "01M43W62CSG5RQM18ZV6025ED0",
+  "status": "COMPLETED",
+  "stdout": "",
+  "stderr": "  File \"/sandbox/main.py\", line 1\n    def (\n        ^\nSyntaxError: invalid syntax\n",
+  "exit_code": 1,
+  "wall_time_ms": 518,
+  "cpu_time_ms": 38,
+  "memory_bytes": 4911104,
+  "oom_killed": false,
+  "timed_out": false,
+  "truncated": false,
+  "files": []
+}
+```
+**stdin and files** - `POST /v1/execute` with `stdin: "abc\n"` and `files: [{name: "data.txt", ...}]` (input files are at `/sandbox/<name>`) -> `200`
+
+```json
+{
+  "job_id": "01M43W6337TVJKWH732BHD3ZS5",
+  "status": "COMPLETED",
+  "stdout": "abc from file\n",
+  "stderr": "",
+  "exit_code": 0,
+  "wall_time_ms": 587,
+  "cpu_time_ms": 75,
+  "memory_bytes": 4874240,
+  "oom_killed": false,
+  "timed_out": false,
+  "truncated": false,
+  "files": []
+}
+```
+**timeout job** - `POST /v1/execute` with `timeout_seconds: 2` and `while True: pass` - HTTP 200, `status: TIMEOUT`, `exit_code: null` -> `200`
+
+```json
+{
+  "job_id": "01M43W63SJE4ARYTAS8HP4XTZ9",
+  "status": "TIMEOUT",
+  "stdout": "",
+  "stderr": "",
+  "exit_code": null,
+  "wall_time_ms": 2275,
+  "cpu_time_ms": 938,
+  "memory_bytes": 6656000,
+  "oom_killed": false,
+  "timed_out": true,
+  "truncated": false,
+  "files": []
+}
+```
+**async submit** - `POST /v1/execute/async` -> `202`
+
+```json
+{
+  "job_id": "01M43W60HRM14JBQ26TG56SFZH",
+  "status": "PENDING",
+  "poll_url": "/v1/jobs/01M43W60HRM14JBQ26TG56SFZH"
+}
+```
+**job record terminal** - `GET /v1/jobs/{id}` after completion (a `JobRecord`: the request, the worker that ran it, and the result) -> `200`
+
+```json
+{
+  "job_id": "01M43W60HRM14JBQ26TG56SFZH",
+  "user_id": "example-user",
+  "language": "bash",
+  "status": "COMPLETED",
+  "request": {
+    "language": "bash",
+    "code": "echo async",
+    "timeout_seconds": 10
+  },
+  "created_at": "2026-10-04T16:33:03.033Z",
+  "updated_at": "2026-10-04T16:33:03.976311+00:00",
+  "retries": 0,
+  "worker_id": "fc5031193210-a9b4abce",
+  "result": {
+    "job_id": "01M43W60HRM14JBQ26TG56SFZH",
+    "status": "COMPLETED",
+    "stdout": "async\n",
+    "stderr": "",
+    "exit_code": 0,
+    "wall_time_ms": 808,
+    "cpu_time_ms": 44,
+    "memory_bytes": 4907008,
+    "oom_killed": false,
+    "timed_out": false,
+    "truncated": false,
+    "files": []
+  }
+}
+```
+**validation error** - `POST /v1/execute` with an unknown language -> `400`
+
+```json
+{
+  "type": "https://docs.sandbox.local/errors/validation-error",
+  "title": "Validation Error",
+  "status": 400,
+  "detail": "The request body failed validation.",
+  "instance": "/execute",
+  "code": "validation-error",
+  "errors": [
+    {
+      "field": "language",
+      "message": "language must be one of: python, javascript, typescript, java, go, ruby, rust, bash"
+    }
+  ]
+}
+```
+**no credentials** - `POST /v1/execute` without credentials (anonymous disabled) -> `401`
+
+```json
+{
+  "type": "https://docs.sandbox.local/errors/unauthenticated",
+  "title": "Authentication required",
+  "status": 401,
+  "detail": "Provide a Bearer JWT in Authorization or a key in X-API-Key.",
+  "instance": "/execute"
+}
+```
+**bad token** - `POST /v1/execute` with a malformed bearer token -> `403`
+
+```json
+{
+  "type": "https://docs.sandbox.local/errors/forbidden",
+  "title": "Invalid token",
+  "status": 403,
+  "detail": "JWT verification failed: invalid header",
+  "instance": "/execute"
+}
+```
+**cancel terminal job** - `DELETE /v1/jobs/{id}` on a finished job -> `409`
+
+```json
+{
+  "type": "https://docs.sandbox.local/errors/already-terminal",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Job is already COMPLETED.",
+  "instance": "/jobs/01M43W60HRM14JBQ26TG56SFZH",
+  "code": "already-terminal"
+}
+```
+**malformed json** - `POST /v1/execute` with body `{not json` -> `400`
+
+```json
+{
+  "type": "https://docs.sandbox.local/errors/validation-error",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "The request body could not be parsed.",
+  "instance": "/v1/execute",
+  "code": "validation-error"
+}
+```
+Notes from the captures:
+
+* `instance` is `req.path` as seen by the router, so for errors raised inside the `/v1` routers it
+  is mount-relative (`/execute`, `/jobs/<id>`), while errors raised by the global handler use the
+  full path (`/v1/execute`). Clients should not parse it.
+* `memory_bytes` and `cpu_time_ms` come from the worker's cgroup sampler (50 ms interval); they are
+  `0` if the container is too short-lived or the cgroup path is not visible to the worker.
+* After these jobs finished, `XLEN sandbox:jobs` was `0`, `XPENDING` was `0` and the user's
+  concurrency set had `0` members (acked entries are deleted and slots released by the worker).

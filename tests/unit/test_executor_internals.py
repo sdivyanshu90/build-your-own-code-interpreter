@@ -159,3 +159,35 @@ class TestSafeBasename:
 
     def test_accepts_normal(self):
         assert _safe_basename("data.csv") == "data.csv"
+
+
+class _ChunkedStream:
+    """A stream whose reads return pre-split chunks (to cut multi-byte characters)."""
+
+    def __init__(self, chunks: list[bytes]) -> None:
+        self._chunks = list(chunks)
+
+    async def read(self, _n: int) -> bytes:
+        return self._chunks.pop(0) if self._chunks else b""
+
+
+class TestPumpDecoding:
+    async def test_multibyte_character_split_across_reads_is_not_corrupted(self, worker_config):
+        # Regression: each chunk used to be decoded independently with errors="replace".
+        from worker.sandbox.executor import SandboxExecutor, _OutputCapture
+
+        text = "héllo ✓ 日本語"
+        raw = text.encode("utf-8")
+        cut = raw.index("✓".encode()) + 1  # in the middle of the 3-byte check mark
+        stream = _ChunkedStream([raw[:cut], raw[cut:]])
+        capture = _OutputCapture(1024)
+        seen: list[str] = []
+
+        async def on_output(_kind: str, data: str) -> None:
+            seen.append(data)
+
+        ex = SandboxExecutor(worker_config)
+        await ex._pump(stream, "stdout", capture, on_output)  # type: ignore[arg-type]
+        assert capture.stdout == text
+        assert "".join(seen) == text
+        assert "�" not in capture.stdout

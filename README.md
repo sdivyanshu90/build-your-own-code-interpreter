@@ -19,14 +19,17 @@ another tenant's data, or persist anything across runs.
                        Prometheus · Grafana · Loki  (metrics, dashboards, logs)
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design, threat model, and
-isolation layers.
+Full documentation: **[`docs/`](docs/README.md)** - overview, architecture diagrams, code
+walkthrough, sandbox internals, threat model, API, configuration, benchmarks, testing,
+deployment, troubleshooting.
 
 ## Features
 
-- **8 layers of defence in depth** — Linux namespaces, read-only rootfs, `--network none`,
-  default-deny **seccomp** allowlists per language, all capabilities dropped, cgroups v2 limits
-  (memory/CPU/PID), `nobody` + user-namespace remapping, and immutable pinned/signed images.
+- **Defence in depth** — Linux namespaces, read-only rootfs, `--network none`, **seccomp**
+  (default-deny allow-lists for Python/JS/Java/Ruby/Bash, a block-list for TypeScript/Go/Rust),
+  all capabilities dropped, `no-new-privileges`, cgroups v2 limits (memory/CPU/PIDs), non-root
+  `nobody`, and optional digest-pinned images. User-namespace remapping, gVisor and a socket proxy
+  are *not* part of the repo (see the [threat model](docs/THREAT_MODEL.md#5-implementation-status-of-controls-claimed-elsewhere)).
 - **8 language runtimes** — Python, JavaScript, TypeScript, Java, Go, Ruby, Rust, Bash.
 - **Sync, async, and streaming** execution (REST long-poll, job polling, and a WebSocket that
   streams stdout/stderr live).
@@ -34,12 +37,50 @@ isolation layers.
   caps; a fork bomb or infinite loop degrades only its own job.
 - **Multi-tenant controls** — JWT + API-key auth, sliding-window rate limits and concurrency
   quotas by tier, RFC 7807 errors.
-- **Observability-first** — Prometheus metrics, a provisioned Grafana dashboard, structured JSON
-  logs to Loki, and W3C trace-context propagation from HTTP → queue → container.
-- **Resilient** — at-least-once queue with dead-worker reclaim and a dead-letter queue, a Docker
-  circuit breaker, a leaked-container GC reaper, and graceful shutdown.
-- **Tested** — 230+ unit/integration/security tests, ≥90% line / ≥85% branch coverage gates, plus
-  a real-Docker container-escape suite and a k6 load test.
+- **Observability** — Prometheus metrics, a provisioned Grafana dashboard and alert rules,
+  structured JSON logs to Loki. (A W3C `traceparent` is generated at the API but not yet consumed
+  by the worker; there is no OTLP export.)
+- **Resilient** — at-least-once Redis Streams queue with dead-worker reclaim and a dead-letter
+  stream, a Redis circuit breaker in the API, a leaked-container GC reaper, and graceful worker
+  drain.
+- **Tested** — 262 unit/API-integration tests and 59 real-Docker integration, escape and seccomp
+  tests (all passing; benchmark host), ≥90% line / ≥85% branch coverage gates (see [TESTING](docs/TESTING.md)).
+
+## Benchmarks (headline)
+
+Measured on one shared WSL2 laptop (11th-gen i5-1135G7, 8 logical CPUs, 5.8 GB RAM, Docker 29.4.3,
+cgroup v2) on 2026-10-04; other workloads were running on the same machine, so read tails with
+care. Commands, raw data and caveats: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md),
+[`benchmarks/`](benchmarks/README.md).
+
+Hello-world execution through `SandboxExecutor` against real Docker, warm runs, milliseconds
+(executor run 1, taken before the `--init` change on the quietest host; raw data in
+`benchmarks/results/executor_latency_before_init.json`; `container` = container creation + program + teardown, `total` adds the executor's
+docker CLI round trips):
+
+| language | container p50 | total p50 | total p95 | first run (cold) |
+|---|---|---|---|---|
+| python | 544 | 838 | 1,944 | 1,056 |
+| javascript | 556 | 830 | 1,833 | 1,890 |
+| bash | 512 | 772 | 1,101 | 733 |
+| ruby | 526 | 821 | 5,189 | 850 |
+| typescript | 1,192 | 1,478 | 3,640 | 1,591 |
+| java | 1,178 | 1,449 | 1,905 | 1,836 |
+| go | 1,034 | 1,338 | 1,967 | 2,252 |
+| rust | 1,020 | 1,288 | 12,605 | 3,281 |
+
+Through the full stack (API + Redis + one 4-slot worker, memory-capped containers, same laptop): a
+Python hello-world via `POST /v1/execute` had p50 1,034 ms / p95 1,917 ms (n=30), about 0.2 s above
+the executor alone. Idle memory: API 28 MiB, worker 72 MiB, Redis 36 MiB, MinIO 248 MiB.
+**Throughput figures are not reported as a capacity claim**: during those runs the host was
+oversubscribed by other workloads (load average 8-30) and hello-world jobs began to time out at 8+
+concurrent clients; the raw tables and the explanation are in `docs/BENCHMARKS.md`.
+
+Other measured facts: the hardened `docker run` flag set costs nothing against a bare `docker run`
+(about 110-140 ms *faster* at p50, because `--network=none` skips network setup); the executor's
+own bookkeeping adds about 0.26-0.31 s (two docker CLI calls); timeout overshoot fell from 2.7-4.4 s
+to 0.5-1.2 s after running sandboxes under `docker --init`; all 59 real-container integration,
+escape and seccomp tests pass.
 
 ## Prerequisites
 
@@ -91,14 +132,14 @@ Copy `.env.example` → `.env`. Key variables (see `.env.example` for the full a
 | `API_KEYS` | _(empty)_ | Machine keys, `key:tier` comma-separated (`tier` = `authenticated`\|`premium`). |
 | `MAX_CODE_SIZE_BYTES` | `262144` | Max source size (256 KiB). |
 | `MAX_STDIN_BYTES` | `262144` | Max stdin (256 KiB). |
-| `DEFAULT_TIMEOUT_SECONDS` / `MAX_TIMEOUT_SECONDS` | `10` / `30` | Wall-clock timeout default and ceiling. |
+| `DEFAULT_TIMEOUT_SECONDS` / `MAX_TIMEOUT_SECONDS` | `10` / `30` | Wall-clock timeout default and ceiling (the worker additionally caps per language, e.g. 10 s for Python). |
 | `RATE_LIMIT_*_PER_MINUTE` | `10`/`60`/`600` | Per-minute limits for anonymous / authenticated / premium. |
 | `MAX_CONCURRENT_JOBS` / `_PREMIUM` | `5` / `25` | Per-user concurrent-job quota. |
 | `WORKER_CONCURRENCY` | `4` | Max concurrent sandboxes per worker process. |
 | `SANDBOX_HOST_WORKDIR` | `/tmp/code-sandbox-work` | **Host** dir shared with the worker for per-job code (must be daemon-visible for the read-only bind mount). |
 | `SANDBOX_IMAGE_TAG` | `latest` | Tag of the `sandbox-runtime-<lang>` images. |
 | `REDIS_URL`, `MINIO_*` | _(see file)_ | Backing services. |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(empty)_ | OTLP collector for traces (empty disables export). |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(empty)_ | Accepted but currently has no effect (no OTLP exporter). |
 
 ## Supported languages
 
@@ -156,10 +197,11 @@ console.log((await r.json()).stdout); // "55\n"
 Untrusted code runs inside a single-use container with **no network**, a **read-only root
 filesystem**, **all Linux capabilities dropped**, `no-new-privileges`, a **default-deny seccomp**
 profile, cgroup memory/CPU/PID limits, a non-root `nobody` user, and a hard wall-clock timeout.
-The Docker socket is never exposed to sandboxes. Eight independent layers mean defeating the
-sandbox requires chaining multiple hardened controls. Full details, the threat model, what is and
-is **not** protected against (e.g. microarchitectural side channels), and a production hardening
-checklist are in [`docs/SECURITY.md`](docs/SECURITY.md).
+The Docker socket is never exposed to sandboxes. Defeating the sandbox requires chaining several
+independent controls, but all sandboxes share the host kernel. Full details, the threat model, what is and
+is **not** protected against (shared-kernel and microarchitectural risks, the worker's Docker
+socket), and a production hardening checklist are in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
+and [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ## Development
 
@@ -181,7 +223,8 @@ api/        Node/TypeScript HTTP + WebSocket gateway
 worker/     Python worker daemon + the sandbox engine (sandbox/, queue/, storage/)
 runtimes/   Per-language Dockerfile + generated seccomp profile
 monitoring/ Prometheus, Grafana (datasources + dashboard), Loki, Promtail configs
-docs/       ARCHITECTURE, API, SECURITY, ADDING_LANGUAGE, RUNBOOK
+benchmarks/ reproducible benchmark harness + raw results
+docs/       handbook (start at docs/README.md)
 tests/      unit, integration, e2e, security suites + fixtures
 ```
 

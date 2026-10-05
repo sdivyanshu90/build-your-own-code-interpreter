@@ -2,7 +2,133 @@
 
 > Status: **Production design baseline** · Audience: platform, security, and SRE engineers · Last reviewed: 2026-06
 
+> **Reading note (added after the code audit).** This document is the original design baseline.
+> Several controls it describes as part of the design are *not implemented in the code* or are
+> optional: user-namespace remapping, gVisor, a Docker socket proxy, cosign verification at run
+> time, an egress proxy, OTLP export and worker-side trace propagation, and result artifacts.
+> Section 5 of [THREAT_MODEL.md](THREAT_MODEL.md) lists each claim with its verified status;
+> [SANDBOX.md](SANDBOX.md) describes what the executor really does. The diagrams in section 1.0
+> below match the code.
+
 ---
+
+## 1.0 Verified diagrams
+
+### Components
+
+```mermaid
+flowchart LR
+  subgraph Client
+    C[curl / SDK / browser]
+  end
+  subgraph API["API (Node/TS, Express + ws)"]
+    MW["auth -> rate limit -> validate"]
+    EX["/v1/execute, /v1/execute/async"]
+    JB["/v1/jobs/:id"]
+    WS["WS /v1/execute/stream"]
+  end
+  subgraph Redis
+    ST[("stream sandbox:jobs<br/>group workers")]
+    KV[("job record, result,<br/>cancel flag, quota, rate limit")]
+    PS(("pub/sub<br/>sandbox:stream:id"))
+  end
+  subgraph Worker["Worker (Python/asyncio) x N"]
+    CL["consume loop<br/>(free-slot bounded)"]
+    EXE["SandboxExecutor"]
+    RP["ContainerReaper"]
+  end
+  D[(Docker daemon)]
+  SB["sandbox container<br/>(nobody, no net, ro)"]
+  M[(MinIO<br/>result archive)]
+  C --> MW --> EX & JB & WS
+  EX -- "XADD + SET PENDING" --> ST & KV
+  WS -- "XADD" --> ST
+  CL -- "XREADGROUP / XACK+XDEL / XCLAIM" --> ST
+  CL --> EXE -- "docker run / kill / rm" --> D --> SB
+  EXE -- "stdout/stderr chunks" --> PS --> WS
+  CL -- "record + result" --> KV
+  CL -. "best effort" .-> M
+  JB & EX -- "poll record" --> KV
+  RP -- "docker ps/rm" --> D
+```
+
+### Request lifecycle (synchronous mode)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Client
+  participant A as API
+  participant R as Redis
+  participant W as Worker
+  participant D as Docker
+  participant S as Sandbox
+  C->>A: POST /v1/execute {language, code}
+  A->>A: authenticate, validate
+  A->>R: Lua sliding-window (user + ip)
+  A->>R: Lua acquire concurrency slot
+  A->>R: MULTI: XADD sandbox:jobs, SET job record PENDING (TTL 2h)
+  loop every 100 ms until terminal or window ends
+    A->>R: GET job record
+  end
+  W->>R: XREADGROUP (BLOCK 5s)
+  W->>R: PATCH record RUNNING
+  W->>D: docker image inspect
+  W->>D: docker run --rm (hardened flags)
+  D->>S: start
+  S-->>W: stdout/stderr (stream) -> PUBLISH chunks
+  alt exits
+    S-->>D: exit code
+  else timeout / cancel
+    W->>D: docker kill TERM, wait grace, kill KILL
+  end
+  W->>R: SET result (TTL 1h), PATCH record terminal, PUBLISH done
+  W->>R: ZREM slot, XACK + XDEL
+  A->>R: GET record -> terminal
+  A->>R: ZREM slot (sync path)
+  A-->>C: 200 ExecutionResult  (or 408 if window elapsed)
+```
+
+### Job state machine
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING: API enqueue
+  PENDING --> RUNNING: worker picks up
+  PENDING --> KILLED: DELETE before pickup (flag checked at pickup)
+  RUNNING --> COMPLETED: process exited (any exit code except OOM 137)
+  RUNNING --> FAILED: exit 137 (OOM), sandbox/infra error
+  RUNNING --> TIMEOUT: wall-clock timeout
+  RUNNING --> KILLED: DELETE while running
+  RUNNING --> RUNNING: Docker down, entry left pending, re-run after reclaim
+  PENDING --> FAILED: delivery count > max retries, or malformed payload
+  RUNNING --> FAILED: delivery count > max retries
+  COMPLETED --> [*]
+  FAILED --> [*]
+  TIMEOUT --> [*]
+  KILLED --> [*]
+```
+
+`DELETE` also rewrites the record to `KILLED` immediately (optimistic); the worker later writes
+the authoritative terminal state. Record TTL 2 h, result TTL 1 h.
+
+### Delivery semantics
+
+```mermaid
+flowchart TD
+  A["XREADGROUP new entry"] --> B{"delivery count > max_retries?"}
+  B -- yes --> X["finalize FAILED + dead-letter + XACK/XDEL"]
+  B -- no --> C{"payload parses?"}
+  C -- no --> X
+  C -- yes --> D{"cancel flag set?"}
+  D -- yes --> K["finalize KILLED, XACK/XDEL"]
+  D -- no --> E["run in sandbox"]
+  E -- result stored --> F["XACK + XDEL"]
+  E -- DockerUnavailableError --> G["leave pending"]
+  E -- other exception --> H["finalize FAILED, XACK/XDEL"]
+  G --> I["idle over 60 s: any worker XCLAIMs, delivery count + 1"]
+  I --> B
+```
 
 ## 1.1 Executive Summary
 

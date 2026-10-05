@@ -109,13 +109,12 @@ export function limitForTier(tier: UserTier): number {
   }
 }
 
-/** Extract a best-effort client IP, honouring a single trusted proxy hop. */
-export function clientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    const first = forwarded.split(',')[0];
-    if (first) return first.trim();
-  }
+/**
+ * Best-effort client IP. Relies on Express's `trust proxy` setting (one hop, see app.ts) rather
+ * than parsing X-Forwarded-For here: the left-most XFF entry is client-controlled, so trusting it
+ * would let any caller mint a fresh IP-limit bucket per request.
+ */
+export function clientIp(req: Pick<Request, 'ip' | 'socket'>): string {
   return req.ip ?? req.socket.remoteAddress ?? 'unknown';
 }
 
@@ -135,23 +134,13 @@ export function rateLimitMiddleware(req: Request, res: Response, next: NextFunct
     principal = { user_id: clientIp(req), tier: 'anonymous', auth_method: 'anonymous' };
   }
 
-  const userLimit = limitForTier(principal.tier);
-  // The IP limit is generous (protects against a single host hammering many keys) but present.
-  const ipLimit = Math.max(userLimit, getConfig().RATE_LIMIT_PREMIUM_PER_MINUTE);
+  void evaluateRateLimit(principal, clientIp(req))
+    .then((outcome) => {
+      res.setHeader('RateLimit-Limit', String(outcome.userLimit));
+      res.setHeader('RateLimit-Remaining', String(Math.max(0, outcome.remaining)));
 
-  void Promise.all([
-    limiter.check(REDIS_KEYS.rateLimit('user', principal.user_id), userLimit, WINDOW_MS),
-    limiter.check(REDIS_KEYS.rateLimit('ip', clientIp(req)), ipLimit, WINDOW_MS),
-  ])
-    .then(([userOutcome, ipOutcome]) => {
-      const blocked = !userOutcome.allowed || !ipOutcome.allowed;
-      const remaining = Math.min(userOutcome.remaining, ipOutcome.remaining);
-      res.setHeader('RateLimit-Limit', String(userLimit));
-      res.setHeader('RateLimit-Remaining', String(Math.max(0, remaining)));
-
-      if (blocked) {
-        const retryAfterMs = Math.max(userOutcome.retryAfterMs, ipOutcome.retryAfterMs);
-        const retryAfterSec = Math.ceil(retryAfterMs / 1000);
+      if (outcome.blocked) {
+        const retryAfterSec = Math.ceil(outcome.retryAfterMs / 1000);
         res.setHeader('Retry-After', String(retryAfterSec));
         rateLimitedTotal.inc({ tier: principal.tier });
         problem(
@@ -171,4 +160,24 @@ export function rateLimitMiddleware(req: Request, res: Response, next: NextFunct
       logger.error({ err: (err as Error).message }, 'rate limiter unexpected error');
       next();
     });
+}
+
+/** Combined IP + user verdict for one request (shared by the HTTP middleware and WebSocket). */
+export async function evaluateRateLimit(
+  principal: Principal,
+  ip: string,
+): Promise<{ blocked: boolean; remaining: number; retryAfterMs: number; userLimit: number }> {
+  const userLimit = limitForTier(principal.tier);
+  // The IP limit is generous (protects against a single host hammering many keys) but present.
+  const ipLimit = Math.max(userLimit, getConfig().RATE_LIMIT_PREMIUM_PER_MINUTE);
+  const [userOutcome, ipOutcome] = await Promise.all([
+    limiter.check(REDIS_KEYS.rateLimit('user', principal.user_id), userLimit, WINDOW_MS),
+    limiter.check(REDIS_KEYS.rateLimit('ip', ip), ipLimit, WINDOW_MS),
+  ]);
+  return {
+    blocked: !userOutcome.allowed || !ipOutcome.allowed,
+    remaining: Math.min(userOutcome.remaining, ipOutcome.remaining),
+    retryAfterMs: Math.max(userOutcome.retryAfterMs, ipOutcome.retryAfterMs),
+    userLimit,
+  };
 }

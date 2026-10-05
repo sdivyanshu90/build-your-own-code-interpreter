@@ -1,0 +1,31 @@
+# Overlay for benchmarking on a small/shared machine. Use together with the base file and only the
+# services the benchmark needs (no Prometheus/Grafana/Loki):
+#
+#   docker compose -f docker-compose.yml -f benchmarks/docker-compose.bench.yml \
+#       up -d --build redis minio api worker
+#
+# It (1) caps every container's memory, (2) lifts the per-user rate/concurrency limits so the
+# load generator measures the pipeline rather than the quota, and (3) pins a known JWT secret.
+name: code-sandbox
+
+services:
+  redis:
+    mem_limit: 128m
+  minio:
+    # The committed results (2026-10-04) were measured with quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    # from the local image cache, before the base file moved to the Chainguard image. MinIO only serves
+    # result archives, off the measured execution path.
+    mem_limit: 384m
+  api:
+    mem_limit: 256m
+    environment:
+      JWT_SECRET: bench-secret-bench-secret-bench-secret-123456
+      ALLOW_ANONYMOUS: "false"
+      RATE_LIMIT_PREMIUM_PER_MINUTE: "1000000"
+      RATE_LIMIT_REQUESTS_PER_MINUTE: "1000000"
+      MAX_CONCURRENT_JOBS_PREMIUM: "200"
+      MAX_CONCURRENT_JOBS: "200"
+  worker:
+    mem_limit: 256m
+    environment:
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}

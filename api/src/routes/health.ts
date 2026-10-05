@@ -10,6 +10,7 @@ import { getRedis } from '../services/redis.js';
 import { minioHealthy } from '../services/resultStore.js';
 import { getQueueDepth } from '../services/jobQueue.js';
 import { queueDepth, renderMetrics } from '../telemetry/metrics.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
 
 export const healthRouter = Router();
 
@@ -32,19 +33,17 @@ async function redisStatus(): Promise<'up' | 'down'> {
  *       '200': { description: All hard dependencies are reachable. }
  *       '503': { description: A hard dependency is unavailable. }
  */
-healthRouter.get('/health', (_req: Request, res: Response) => {
-  void (async (): Promise<void> => {
-    const [redis, minio] = await Promise.all([redisStatus(), minioHealthy()]);
-    const ok = redis === 'up';
-    res.status(ok ? 200 : 503).json({
-      status: ok ? 'ok' : 'degraded',
-      redis,
-      minio: minio ? 'up' : 'down',
-      uptime_seconds: Math.floor(process.uptime()),
-      version: process.env.npm_package_version ?? '1.0.0',
-    });
-  })();
-});
+healthRouter.get('/health', asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+  const [redis, minio] = await Promise.all([redisStatus(), minioHealthy()]);
+  const ok = redis === 'up';
+  res.status(ok ? 200 : 503).json({
+    status: ok ? 'ok' : 'degraded',
+    redis,
+    minio: minio ? 'up' : 'down',
+    uptime_seconds: Math.floor(process.uptime()),
+    version: process.env.npm_package_version ?? '1.0.0',
+  });
+}));
 
 /**
  * @openapi
@@ -54,15 +53,13 @@ healthRouter.get('/health', (_req: Request, res: Response) => {
  *     responses:
  *       '200': { description: Metrics in the Prometheus text exposition format. }
  */
-healthRouter.get('/metrics', (_req: Request, res: Response) => {
-  void (async (): Promise<void> => {
-    // Refresh the queue-depth gauge on scrape.
-    try {
-      queueDepth.set(await getQueueDepth());
-    } catch {
-      /* best-effort */
-    }
-    res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
-    res.status(200).send(await renderMetrics());
-  })();
-});
+healthRouter.get('/metrics', asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+  // Refresh the queue-depth gauge on scrape.
+  try {
+    queueDepth.set(await getQueueDepth());
+  } catch {
+    /* best-effort */
+  }
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.status(200).send(await renderMetrics());
+}));

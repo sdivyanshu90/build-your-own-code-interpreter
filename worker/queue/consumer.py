@@ -28,6 +28,9 @@ from worker.sandbox import constants
 
 logger = logging.getLogger("sandbox.worker.consumer")
 
+# Approximate cap on the dead-letter stream so poison messages cannot grow Redis unboundedly.
+DEAD_LETTER_MAXLEN = 1000
+
 
 @dataclass
 class QueueMessage:
@@ -105,8 +108,15 @@ class QueueConsumer:
         return claimed
 
     async def ack(self, msg_id: str) -> None:
-        """Acknowledge an entry (after its result is durably stored)."""
+        """Acknowledge an entry (after its result is durably stored) and delete it.
+
+        ``XACK`` alone only clears the pending-entries list; the entry (which embeds the user's
+        source code) would stay in the stream forever, growing Redis without bound and making
+        ``XLEN`` useless as a queue-depth signal. ``XDEL`` after ``XACK`` keeps the stream equal
+        to "not yet finished" work.
+        """
         await self.redis.xack(self.stream, self.group, msg_id)
+        await self.redis.xdel(self.stream, msg_id)
 
     async def dead_letter(self, message: QueueMessage, reason: str) -> None:
         """Move an entry to the dead-letter stream and ack it off the main stream."""
@@ -117,6 +127,8 @@ class QueueConsumer:
                 "reason": reason,
                 "delivery_count": str(message.delivery_count),
             },
+            maxlen=DEAD_LETTER_MAXLEN,
+            approximate=True,
         )
         await self.ack(message.msg_id)
         logger.warning(
@@ -129,7 +141,7 @@ class QueueConsumer:
         )
 
     async def queue_depth(self) -> int:
-        """Approximate pending depth (stream length)."""
+        """Approximate backlog: entries not yet finished (stream length; acked entries are deleted)."""
         try:
             return int(await self.redis.xlen(self.stream))
         except ResponseError:  # pragma: no cover - stream may not exist yet

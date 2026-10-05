@@ -66,7 +66,15 @@ TypeScript union and the Python dicts are kept in sync only by this checklist.
 8. **Update the docs tables** in `docs/API.md` and `README.md`.
 
 Also add the language to the `LANGS` list in the `Makefile` so `build-runtimes`,
-`security-scan`, and `seccomp-regen` iterate over it.
+`security-scan`, and `seccomp-regen` iterate over it, and to the `lang:` matrix in
+`.github/workflows/security.yml` so the nightly Trivy scan covers the new image.
+
+If the toolchain is a compiler or loader that spawns helpers (like tsx, Go and Rust), a curated
+allow-list will probably not work: add the id to `BLOCKLIST_LANGUAGES` in `seccomp.py` to get the
+default-allow profile that still denies every `DANGEROUS_SYSCALLS` entry, and understand the
+trade-off first ([ADR-004](DESIGN_DECISIONS.md#adr-004-block-list-seccomp-for-toolchain-runtimes)).
+Compiled languages that must execute their output also need `needs_exec_build: True` so they get
+the executable `/build` tmpfs ([SANDBOX.md](SANDBOX.md#2-the-docker-run-command)).
 
 ---
 

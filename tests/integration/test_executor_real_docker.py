@@ -105,8 +105,11 @@ class TestRealDockerExecution:
         require_language("python")
         code = "print(open('/proc/1/cmdline','rb').read())"
         result = await _run(real_executor, "python", code)
-        # PID 1 inside the container is the sandboxed runtime, never the host init.
-        assert "docker" not in result.stdout and "systemd" not in result.stdout
+        # PID 1 inside the container is docker-init (tini) wrapping the sandboxed runtime, never
+        # the host's init or the container daemon.
+        assert "python3" in result.stdout
+        for host_process in ("dockerd", "containerd", "systemd"):
+            assert host_process not in result.stdout
 
     async def test_python_cannot_read_etc_shadow(self, real_executor, require_language):
         require_language("python")
@@ -150,23 +153,41 @@ class TestRealDockerExecution:
         assert result.status in ("FAILED", "TIMEOUT")
         assert "629145600" not in result.stdout  # the allocation never completed
 
+    async def test_sigterm_reaches_a_program_without_a_handler(
+        self, worker_config, docker_available, require_language
+    ):
+        # With a long grace period the job only finishes quickly if SIGTERM (not the later
+        # SIGKILL) stops the program, i.e. if PID 1 forwards signals (docker --init).
+        import dataclasses
+
+        from worker.sandbox.executor import SandboxExecutor
+
+        require_language("python")
+        config = dataclasses.replace(worker_config, sigterm_grace_seconds=15)
+        request = ExecutionRequest(
+            language="python", code="while True:\n    pass", timeout_seconds=1
+        )
+        result = await SandboxExecutor(config).execute(request, "it-sigterm-forwarded")
+        assert result.status == "TIMEOUT"
+        assert result.wall_time_ms < 10_000, "SIGTERM was ignored; only the SIGKILL ended it"
+
     async def test_container_is_not_present_after_execution(self, real_executor, require_language):
         require_language("python")
-        await _run(real_executor, "python", "print('done')")
+        request = ExecutionRequest(language="python", code="print('done')", timeout_seconds=15)
+        await real_executor.execute(request, "it-cleanup-check")
         proc = await asyncio.create_subprocess_exec(
             "docker",
             "ps",
             "-a",
             "--filter",
-            "label=sandbox-managed=1",
+            "name=sandbox-it-cleanup-check",
             "--format",
             "{{.ID}}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         out, _ = await proc.communicate()
-        # Any leftover would be reaped; immediately after --rm there should be none from us.
-        assert out.decode().strip() == "" or True  # tolerant: other tests may run concurrently
+        assert out.decode().strip() == ""
 
     async def test_temp_files_cleaned_up_on_host(
         self, real_executor, worker_config, require_language

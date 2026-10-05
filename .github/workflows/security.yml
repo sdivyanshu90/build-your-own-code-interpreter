@@ -24,7 +24,7 @@ jobs:
       - name: Build the runtime image
         run: docker build -t sandbox-runtime-${{ matrix.lang }}:latest runtimes/${{ matrix.lang }}
       - name: Scan with Trivy (fail on HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: sandbox-runtime-${{ matrix.lang }}:latest
           severity: 'HIGH,CRITICAL'
@@ -47,7 +47,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - run: make build-services
       - name: Scan API image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           severity: 'HIGH,CRITICAL'
@@ -55,7 +55,7 @@ jobs:
           ignore-unfixed: true
           image-ref: code-sandbox-api:latest
       - name: Scan worker image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           severity: 'HIGH,CRITICAL'
@@ -100,6 +100,7 @@ jobs:
         with:
           target: 'http://localhost:8080/v1/health'
           fail_action: false
+          allow_issue_writing: false # token has no issues:write; ZAP otherwise exits 1 creating its report issue
           cmd_options: '-I'
       - name: Tear down
         if: always()

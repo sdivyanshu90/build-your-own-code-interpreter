@@ -1,0 +1,213 @@
+{
+  "environment": {
+    "date_utc": "2026-10-04T16:33:01+00:00",
+    "git_sha": "ce4985f",
+    "cpu_model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+    "cpu_count": 8,
+    "mem_total_mb": 5928,
+    "kernel": "6.18.40.1-microsoft-standard-WSL2",
+    "docker_server": "29.4.3",
+    "docker_cgroup": "2 systemd",
+    "python": "3.12.13",
+    "note": "shared WSL2 machine; other workloads may run concurrently (see README caveats)"
+  },
+  "health": {
+    "http_status": 200,
+    "body": {
+      "status": "ok",
+      "redis": "up",
+      "minio": "up",
+      "uptime_seconds": 19,
+      "version": "1.0.0"
+    }
+  },
+  "sync_python": {
+    "http_status": 200,
+    "body": {
+      "job_id": "01M43W5Z4EF3D0TCC8HB6FXS3H",
+      "status": "COMPLETED",
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0,
+      "wall_time_ms": 1017,
+      "cpu_time_ms": 100,
+      "memory_bytes": 13856768,
+      "oom_killed": false,
+      "timed_out": false,
+      "truncated": false,
+      "files": []
+    }
+  },
+  "validation_error": {
+    "http_status": 400,
+    "body": {
+      "type": "https://docs.sandbox.local/errors/validation-error",
+      "title": "Validation Error",
+      "status": 400,
+      "detail": "The request body failed validation.",
+      "instance": "/execute",
+      "code": "validation-error",
+      "errors": [
+        {
+          "field": "language",
+          "message": "language must be one of: python, javascript, typescript, java, go, ruby, rust, bash"
+        }
+      ]
+    }
+  },
+  "no_credentials": {
+    "http_status": 401,
+    "body": {
+      "type": "https://docs.sandbox.local/errors/unauthenticated",
+      "title": "Authentication required",
+      "status": 401,
+      "detail": "Provide a Bearer JWT in Authorization or a key in X-API-Key.",
+      "instance": "/execute"
+    }
+  },
+  "bad_token": {
+    "http_status": 403,
+    "body": {
+      "type": "https://docs.sandbox.local/errors/forbidden",
+      "title": "Invalid token",
+      "status": 403,
+      "detail": "JWT verification failed: invalid header",
+      "instance": "/execute"
+    }
+  },
+  "async_submit": {
+    "http_status": 202,
+    "body": {
+      "job_id": "01M43W60HRM14JBQ26TG56SFZH",
+      "status": "PENDING",
+      "poll_url": "/v1/jobs/01M43W60HRM14JBQ26TG56SFZH"
+    }
+  },
+  "job_record_terminal": {
+    "http_status": 200,
+    "body": {
+      "job_id": "01M43W60HRM14JBQ26TG56SFZH",
+      "user_id": "example-user",
+      "language": "bash",
+      "status": "COMPLETED",
+      "request": {
+        "language": "bash",
+        "code": "echo async",
+        "timeout_seconds": 10
+      },
+      "created_at": "2026-10-04T16:33:03.033Z",
+      "updated_at": "2026-10-04T16:33:03.976311+00:00",
+      "retries": 0,
+      "worker_id": "fc5031193210-a9b4abce",
+      "result": {
+        "job_id": "01M43W60HRM14JBQ26TG56SFZH",
+        "status": "COMPLETED",
+        "stdout": "async\n",
+        "stderr": "",
+        "exit_code": 0,
+        "wall_time_ms": 808,
+        "cpu_time_ms": 44,
+        "memory_bytes": 4907008,
+        "oom_killed": false,
+        "timed_out": false,
+        "truncated": false,
+        "files": []
+      }
+    }
+  },
+  "cancel_terminal_job": {
+    "http_status": 409,
+    "body": {
+      "type": "https://docs.sandbox.local/errors/already-terminal",
+      "title": "Conflict",
+      "status": 409,
+      "detail": "Job is already COMPLETED.",
+      "instance": "/jobs/01M43W60HRM14JBQ26TG56SFZH",
+      "code": "already-terminal"
+    }
+  },
+  "nonzero_exit": {
+    "http_status": 200,
+    "body": {
+      "job_id": "01M43W61FSXJX11F3V9EWZFW4G",
+      "status": "COMPLETED",
+      "stdout": "x\n",
+      "stderr": "",
+      "exit_code": 3,
+      "wall_time_ms": 729,
+      "cpu_time_ms": 114,
+      "memory_bytes": 5124096,
+      "oom_killed": false,
+      "timed_out": false,
+      "truncated": false,
+      "files": []
+    }
+  },
+  "syntax_error": {
+    "http_status": 200,
+    "body": {
+      "job_id": "01M43W62CSG5RQM18ZV6025ED0",
+      "status": "COMPLETED",
+      "stdout": "",
+      "stderr": "  File \"/sandbox/main.py\", line 1\n    def (\n        ^\nSyntaxError: invalid syntax\n",
+      "exit_code": 1,
+      "wall_time_ms": 518,
+      "cpu_time_ms": 38,
+      "memory_bytes": 4911104,
+      "oom_killed": false,
+      "timed_out": false,
+      "truncated": false,
+      "files": []
+    }
+  },
+  "stdin_and_files": {
+    "http_status": 200,
+    "body": {
+      "job_id": "01M43W6337TVJKWH732BHD3ZS5",
+      "status": "COMPLETED",
+      "stdout": "abc from file\n",
+      "stderr": "",
+      "exit_code": 0,
+      "wall_time_ms": 587,
+      "cpu_time_ms": 75,
+      "memory_bytes": 4874240,
+      "oom_killed": false,
+      "timed_out": false,
+      "truncated": false,
+      "files": []
+    }
+  },
+  "timeout_job": {
+    "http_status": 200,
+    "body": {
+      "job_id": "01M43W63SJE4ARYTAS8HP4XTZ9",
+      "status": "TIMEOUT",
+      "stdout": "",
+      "stderr": "",
+      "exit_code": null,
+      "wall_time_ms": 2275,
+      "cpu_time_ms": 938,
+      "memory_bytes": 6656000,
+      "oom_killed": false,
+      "timed_out": true,
+      "truncated": false,
+      "files": []
+    }
+  },
+  "malformed_json": {
+    "http_status": 400,
+    "body": {
+      "type": "https://docs.sandbox.local/errors/validation-error",
+      "title": "Bad Request",
+      "status": 400,
+      "detail": "The request body could not be parsed.",
+      "instance": "/v1/execute",
+      "code": "validation-error"
+    }
+  },
+  "invariants": {
+    "xlen_sandbox_jobs_after_jobs": "0",
+    "xpending_summary": "0",
+    "zcard_concurrency_example_user": "0"
+  }
+}

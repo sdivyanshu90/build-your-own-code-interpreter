@@ -1,0 +1,189 @@
+{
+  "benchmark": "api_latency",
+  "definition": "client-side wall time, one request at a time, single keep-alive connection; sync = POST /v1/execute; async = POST /v1/execute/async then GET /v1/jobs/{id} every 20 ms until terminal. One warm-up request per language is discarded.",
+  "stack": {
+    "worker_concurrency": 4
+  },
+  "environment": {
+    "date_utc": "2026-10-04T16:46:22+00:00",
+    "git_sha": "3af75e7",
+    "cpu_model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+    "cpu_count": 8,
+    "mem_total_mb": 5928,
+    "kernel": "6.18.40.1-microsoft-standard-WSL2",
+    "docker_server": "29.4.3",
+    "docker_cgroup": "2 systemd",
+    "python": "3.12.13",
+    "note": "shared WSL2 machine; other workloads may run concurrently (see README caveats)"
+  },
+  "results": {
+    "python": {
+      "sync": {
+        "n": 30,
+        "min_ms": 613.0,
+        "p50_ms": 1034.4,
+        "p95_ms": 1916.9,
+        "p99_ms": 2288.7,
+        "max_ms": 2288.7,
+        "mean_ms": 1136.1
+      },
+      "async_poll_20ms": {
+        "n": 30,
+        "min_ms": 669.7,
+        "p50_ms": 1019.3,
+        "p95_ms": 2424.7,
+        "p99_ms": 2670.6,
+        "max_ms": 2670.6,
+        "mean_ms": 1171.5
+      },
+      "non_completed": 0
+    },
+    "javascript": {
+      "sync": {
+        "n": 30,
+        "min_ms": 1020.0,
+        "p50_ms": 1970.9,
+        "p95_ms": 11108.8,
+        "p99_ms": 11857.5,
+        "max_ms": 11857.5,
+        "mean_ms": 3358.5
+      },
+      "async_poll_20ms": {
+        "n": 30,
+        "min_ms": 1075.3,
+        "p50_ms": 1688.7,
+        "p95_ms": 5738.7,
+        "p99_ms": 6190.0,
+        "max_ms": 6190.0,
+        "mean_ms": 2305.3
+      },
+      "non_completed": 1
+    },
+    "typescript": {
+      "sync": {
+        "n": 15,
+        "min_ms": 3081.4,
+        "p50_ms": 6936.6,
+        "p95_ms": 13088.8,
+        "p99_ms": 13088.8,
+        "max_ms": 13088.8,
+        "mean_ms": 7792.4
+      },
+      "async_poll_20ms": {
+        "n": 15,
+        "min_ms": 2351.3,
+        "p50_ms": 4543.4,
+        "p95_ms": 8130.1,
+        "p99_ms": 8130.1,
+        "max_ms": 8130.1,
+        "mean_ms": 5034.6
+      },
+      "non_completed": 2
+    },
+    "bash": {
+      "sync": {
+        "n": 30,
+        "min_ms": 611.8,
+        "p50_ms": 1621.5,
+        "p95_ms": 2467.0,
+        "p99_ms": 2517.7,
+        "max_ms": 2517.7,
+        "mean_ms": 1625.0
+      },
+      "async_poll_20ms": {
+        "n": 30,
+        "min_ms": 589.0,
+        "p50_ms": 1338.4,
+        "p95_ms": 5136.5,
+        "p99_ms": 6372.8,
+        "max_ms": 6372.8,
+        "mean_ms": 1849.0
+      },
+      "non_completed": 0
+    },
+    "ruby": {
+      "sync": {
+        "n": 30,
+        "min_ms": 714.3,
+        "p50_ms": 1150.3,
+        "p95_ms": 4918.8,
+        "p99_ms": 13975.0,
+        "max_ms": 13975.0,
+        "mean_ms": 1858.1
+      },
+      "async_poll_20ms": {
+        "n": 30,
+        "min_ms": 559.4,
+        "p50_ms": 873.8,
+        "p95_ms": 2081.6,
+        "p99_ms": 17205.2,
+        "max_ms": 17205.2,
+        "mean_ms": 1547.7
+      },
+      "non_completed": 1
+    },
+    "java": {
+      "sync": {
+        "n": 12,
+        "min_ms": 1316.8,
+        "p50_ms": 1418.2,
+        "p95_ms": 1725.2,
+        "p99_ms": 1725.2,
+        "max_ms": 1725.2,
+        "mean_ms": 1454.2
+      },
+      "async_poll_20ms": {
+        "n": 12,
+        "min_ms": 1317.4,
+        "p50_ms": 1587.0,
+        "p95_ms": 2723.8,
+        "p99_ms": 2723.8,
+        "max_ms": 2723.8,
+        "mean_ms": 1766.9
+      },
+      "non_completed": 0
+    },
+    "go": {
+      "sync": {
+        "n": 10,
+        "min_ms": 2035.0,
+        "p50_ms": 2351.4,
+        "p95_ms": 3443.5,
+        "p99_ms": 3443.5,
+        "max_ms": 3443.5,
+        "mean_ms": 2521.3
+      },
+      "async_poll_20ms": {
+        "n": 10,
+        "min_ms": 1421.9,
+        "p50_ms": 2306.4,
+        "p95_ms": 6535.9,
+        "p99_ms": 6535.9,
+        "max_ms": 6535.9,
+        "mean_ms": 2926.2
+      },
+      "non_completed": 0
+    },
+    "rust": {
+      "sync": {
+        "n": 10,
+        "min_ms": 814.2,
+        "p50_ms": 915.0,
+        "p95_ms": 2037.1,
+        "p99_ms": 2037.1,
+        "max_ms": 2037.1,
+        "mean_ms": 1079.4
+      },
+      "async_poll_20ms": {
+        "n": 10,
+        "min_ms": 868.3,
+        "p50_ms": 1097.0,
+        "p95_ms": 6042.0,
+        "p99_ms": 6042.0,
+        "max_ms": 6042.0,
+        "mean_ms": 2058.1
+      },
+      "non_completed": 0
+    }
+  }
+}

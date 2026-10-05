@@ -1,0 +1,192 @@
+{
+  "benchmark": "timeout_accuracy",
+  "definition": "measured_total = perf_counter around SandboxExecutor.execute for a program that never exits; overshoot = measured - requested. SIGTERM grace is the worker default (SIGTERM_GRACE_SECONDS=2).",
+  "environment": {
+    "date_utc": "2026-10-04T15:53:36+00:00",
+    "git_sha": "a09e3ed",
+    "cpu_model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+    "cpu_count": 8,
+    "mem_total_mb": 5928,
+    "kernel": "6.18.40.1-microsoft-standard-WSL2",
+    "docker_server": "29.4.3",
+    "docker_cgroup": "2 systemd",
+    "python": "3.12.13",
+    "note": "shared WSL2 machine; other workloads may run concurrently (see README caveats)"
+  },
+  "results": {
+    "python_spin_default_signals": {
+      "1": {
+        "requested_ms": 1000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 3620.4,
+          "p50_ms": 3674.1,
+          "p95_ms": 4360.5,
+          "p99_ms": 4360.5,
+          "max_ms": 4360.5,
+          "mean_ms": 3810.1
+        },
+        "overshoot_p50_ms": 2674.1,
+        "overshoot_max_ms": 3360.5
+      },
+      "2": {
+        "requested_ms": 2000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 4628.1,
+          "p50_ms": 5478.5,
+          "p95_ms": 6085.4,
+          "p99_ms": 6085.4,
+          "max_ms": 6085.4,
+          "mean_ms": 5373.9
+        },
+        "overshoot_p50_ms": 3478.5,
+        "overshoot_max_ms": 4085.4
+      },
+      "3": {
+        "requested_ms": 3000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 6346.2,
+          "p50_ms": 6776.0,
+          "p95_ms": 11192.1,
+          "p99_ms": 11192.1,
+          "max_ms": 11192.1,
+          "mean_ms": 8182.2
+        },
+        "overshoot_p50_ms": 3776.0,
+        "overshoot_max_ms": 8192.1
+      },
+      "5": {
+        "requested_ms": 5000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 8007.2,
+          "p50_ms": 9378.5,
+          "p95_ms": 24935.5,
+          "p99_ms": 24935.5,
+          "max_ms": 24935.5,
+          "mean_ms": 12404.0
+        },
+        "overshoot_p50_ms": 4378.5,
+        "overshoot_max_ms": 19935.5
+      }
+    },
+    "python_spin_handles_sigterm": {
+      "1": {
+        "requested_ms": 1000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 2134.9,
+          "p50_ms": 2365.3,
+          "p95_ms": 9276.9,
+          "p99_ms": 9276.9,
+          "max_ms": 9276.9,
+          "mean_ms": 4144.4
+        },
+        "overshoot_p50_ms": 1365.3,
+        "overshoot_max_ms": 8276.9
+      },
+      "2": {
+        "requested_ms": 2000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 2806.8,
+          "p50_ms": 2906.3,
+          "p95_ms": 2922.2,
+          "p99_ms": 2922.2,
+          "max_ms": 2922.2,
+          "mean_ms": 2880.1
+        },
+        "overshoot_p50_ms": 906.3,
+        "overshoot_max_ms": 922.2
+      },
+      "3": {
+        "requested_ms": 3000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 3815.7,
+          "p50_ms": 4059.1,
+          "p95_ms": 4164.2,
+          "p99_ms": 4164.2,
+          "max_ms": 4164.2,
+          "mean_ms": 4048.5
+        },
+        "overshoot_p50_ms": 1059.1,
+        "overshoot_max_ms": 1164.2
+      },
+      "5": {
+        "requested_ms": 5000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 6196.3,
+          "p50_ms": 6419.6,
+          "p95_ms": 10987.6,
+          "p99_ms": 10987.6,
+          "max_ms": 10987.6,
+          "mean_ms": 7490.0
+        },
+        "overshoot_p50_ms": 1419.6,
+        "overshoot_max_ms": 5987.6
+      }
+    },
+    "bash_sleep": {
+      "1": {
+        "requested_ms": 1000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 3651.1,
+          "p50_ms": 4040.0,
+          "p95_ms": 4337.5,
+          "p99_ms": 4337.5,
+          "max_ms": 4337.5,
+          "mean_ms": 4036.8
+        },
+        "overshoot_p50_ms": 3040.0,
+        "overshoot_max_ms": 3337.5
+      },
+      "2": {
+        "requested_ms": 2000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 4605.3,
+          "p50_ms": 4658.3,
+          "p95_ms": 4713.9,
+          "p99_ms": 4713.9,
+          "max_ms": 4713.9,
+          "mean_ms": 4655.2
+        },
+        "overshoot_p50_ms": 2658.3,
+        "overshoot_max_ms": 2713.9
+      },
+      "3": {
+        "requested_ms": 3000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 5589.1,
+          "p50_ms": 5956.7,
+          "p95_ms": 6772.1,
+          "p99_ms": 6772.1,
+          "max_ms": 6772.1,
+          "mean_ms": 6146.4
+        },
+        "overshoot_p50_ms": 2956.7,
+        "overshoot_max_ms": 3772.1
+      },
+      "5": {
+        "requested_ms": 5000,
+        "measured_total": {
+          "n": 5,
+          "min_ms": 7731.9,
+          "p50_ms": 7904.6,
+          "p95_ms": 8783.0,
+          "p99_ms": 8783.0,
+          "max_ms": 8783.0,
+          "mean_ms": 8016.4
+        },
+        "overshoot_p50_ms": 2904.6,
+        "overshoot_max_ms": 3783.0
+      }
+    }
+  }
+}

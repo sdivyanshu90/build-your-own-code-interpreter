@@ -83,7 +83,9 @@ export function createApp(): Express {
     const end = httpRequestDuration.startTimer();
     res.on('finish', () => {
       const matched = req.route as { path?: string } | undefined;
-      const route = matched?.path ? `${req.baseUrl}${matched.path}` : req.path;
+      // Unmatched requests (404s) must not use the raw path: that would let any client create an
+      // unbounded number of Prometheus label values.
+      const route = matched?.path ? `${req.baseUrl}${matched.path}` : 'unmatched';
       const labels = { method: req.method, route, code: String(res.statusCode) };
       httpRequestsTotal.inc(labels);
       end(labels);

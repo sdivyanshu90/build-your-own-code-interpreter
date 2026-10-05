@@ -64,7 +64,7 @@ test-integration: ## Integration tests against real Redis + Docker.
 
 .PHONY: test-e2e
 test-e2e: ## End-to-end tests against the running compose stack.
-	cd api && npx vitest run --config ../tests/e2e/vitest.e2e.config.ts
+	cd api && npx vitest run --config vitest.e2e.config.ts
 
 .PHONY: test-coverage
 test-coverage: ## Unit tests with coverage gates (≥90% line / ≥85% branch).

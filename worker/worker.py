@@ -31,6 +31,9 @@ from worker.telemetry.logging import configure_logging
 # Poll interval for the per-job cancellation watcher.
 _CANCEL_POLL_SECONDS = 0.5
 
+# How long the consume loop sleeps when every pool slot is busy.
+_SLOT_WAIT_SECONDS = 0.05
+
 
 class WorkerDaemon:
     """Owns the consume loop and the lifecycle of a single worker process."""
@@ -44,7 +47,7 @@ class WorkerDaemon:
         self.consumer = QueueConsumer(self.redis, consumer_name=config.worker_id)
         self.publisher = StreamPublisher(self.redis)
         self.store = ResultStore(self.redis, _build_minio(config), config.minio_bucket)
-        self.executor = SandboxExecutor(config)
+        self.executor = SandboxExecutor(config, startup_observer=metrics.CONTAINER_STARTUP.observe)
         self.reaper = ContainerReaper(config)
         self.semaphore = asyncio.Semaphore(config.worker_concurrency)
         self._stopping = asyncio.Event()
@@ -81,17 +84,32 @@ class WorkerDaemon:
 
     # ── consume loop ────────────────────────────────────────────────────────────────────
     async def _consume_loop(self) -> None:
-        """Continuously read new + reclaimed messages and dispatch them under the pool."""
+        """Continuously read new + reclaimed messages and dispatch them under the pool.
+
+        Only as many messages as there are free pool slots are fetched. Reading more than we can
+        start would leave delivered-but-idle entries in the pending list, where another worker's
+        ``claim_stale`` would steal them after ``claim_min_idle_ms`` and run them twice.
+        """
         while not self._stopping.is_set():
             try:
+                capacity = self.config.worker_concurrency - len(self._inflight)
+                if capacity <= 0:
+                    await asyncio.sleep(_SLOT_WAIT_SECONDS)
+                    continue
+                batch = min(self.config.read_count, capacity)
                 metrics.QUEUE_DEPTH.set(await self.consumer.queue_depth())
                 stale = await self.consumer.claim_stale(
-                    self.config.claim_min_idle_ms, self.config.read_count, self.config.max_retries
+                    self.config.claim_min_idle_ms, batch, self.config.max_retries
                 )
                 for message in stale:
                     metrics.RECLAIMED_JOBS.inc()
                     await self._dispatch(message)
-                new = await self.consumer.read(self.config.read_count, self.config.block_ms)
+                capacity = self.config.worker_concurrency - len(self._inflight)
+                if capacity <= 0:
+                    continue
+                new = await self.consumer.read(
+                    min(self.config.read_count, capacity), self.config.block_ms
+                )
                 for message in new:
                     await self._dispatch(message)
             except aioredis.RedisError as exc:
@@ -109,30 +127,46 @@ class WorkerDaemon:
     async def _process(self, message: QueueMessage) -> None:
         """Run one job end-to-end with full error handling. Always acks unless retryable."""
         job_id = message.job_id
+        user_id = str(message.payload.get("user_id") or "")
         if message.delivery_count > self.config.max_retries:
+            # Record a terminal FAILED result first so pollers/streams do not wait forever on a
+            # job that will never run again, then park the entry in the dead-letter stream.
+            language = str(message.payload.get("language") or "unknown")
+            await self._finalize_failed(
+                job_id, language, SandboxError("max retries exceeded", code="max_retries")
+            )
+            await self.store.release_slot(user_id, job_id)
             await self.consumer.dead_letter(message, reason="max_retries_exceeded")
             metrics.DEAD_LETTERED.inc()
             return
         try:
             request = ExecutionRequest.from_dict(message.payload["request"])
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError, AttributeError):
+            if job_id:
+                await self._finalize_failed(
+                    job_id, "unknown", SandboxError("malformed payload", code="malformed_payload")
+                )
+            await self.store.release_slot(user_id, job_id)
             await self.consumer.dead_letter(message, reason="malformed_payload")
             metrics.DEAD_LETTERED.inc()
             return
 
         if await self.store.is_cancelled(job_id):
             await self._finalize_cancelled(job_id, request.language)
+            await self.store.release_slot(user_id, job_id)
             await self.consumer.ack(message.msg_id)
             return
 
         try:
             await self._run_job(job_id, request)
+            await self.store.release_slot(user_id, job_id)
             await self.consumer.ack(message.msg_id)
         except DockerUnavailableError as exc:
             # Transient: do NOT ack — leave pending for reclaim after the daemon recovers.
             self.logger.error("docker unavailable", extra={"job_id": job_id, "err": str(exc)})
         except Exception as exc:
             await self._finalize_failed(job_id, request.language, exc)
+            await self.store.release_slot(user_id, job_id)
             await self.consumer.ack(message.msg_id)
 
     async def _run_job(self, job_id: str, request: ExecutionRequest) -> None:
@@ -194,13 +228,14 @@ class WorkerDaemon:
 
     async def _finalize_failed(self, job_id: str, language: str, exc: Exception) -> None:
         """Record an infrastructure/sandbox failure as a FAILED result with a safe message."""
-        detail = (
-            "unsupported language"
-            if isinstance(exc, UnknownLanguageError)
-            else (
-                "sandbox failure" if isinstance(exc, SandboxError) else "internal execution error"
-            )
-        )
+        if isinstance(exc, UnknownLanguageError):
+            detail = "unsupported language"
+        elif isinstance(exc, SandboxError) and exc.code == "max_retries":
+            detail = "job abandoned after repeated delivery failures"
+        elif isinstance(exc, SandboxError):
+            detail = "sandbox failure"
+        else:
+            detail = "internal execution error"
         self.logger.error(
             "job failed", extra={"job_id": job_id, "language": language, "err": str(exc)}
         )

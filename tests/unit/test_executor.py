@@ -9,6 +9,7 @@ tests/security against actual containers.
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 import json
 
@@ -291,6 +292,26 @@ class TestSandboxExecutorUnit:
         signals = [sig for (name, sig) in fake_docker.killed if name == "sandbox-jobladder"]
         assert "TERM" in signals and "KILL" in signals
 
+    async def test_container_runs_under_an_init_process(self, make_executor, fake_docker):
+        # Regression: without --init the interpreter is PID 1 and ignores the SIGTERM of the
+        # TERM->KILL ladder, so every timeout cost the whole grace period.
+        await make_executor().execute(_py(), "jobinit")
+        assert "--init" in fake_docker.last_run
+
+    async def test_unkillable_container_does_not_hang_the_worker(
+        self, make_executor, fake_docker, monkeypatch
+    ):
+        # Regression: if `docker kill` cannot find the container (kill racing creation), the
+        # executor used to await `docker run` forever. It must force-remove and return.
+        from worker.sandbox import executor as executor_mod
+
+        monkeypatch.setattr(executor_mod, "_KILL_WAIT_SECONDS", 0.05)
+        fake_docker.configure(mode="hang")
+        fake_docker.ignore_kill = True
+        result = await asyncio.wait_for(make_executor().execute(_py(timeout=1), "jobstuck"), 10)
+        assert result.status == "TIMEOUT"
+        assert "sandbox-jobstuck" in fake_docker.removed
+
     async def test_timeout_result_has_timed_out_status(self, make_executor, fake_docker):
         fake_docker.configure(mode="hang")
         result = await make_executor().execute(_py(timeout=1), "jobtos")
@@ -377,3 +398,28 @@ class _StubClock:
 
     def __call__(self) -> float:
         return next(self._it)
+
+
+class TestStartupObserver:
+    async def test_startup_observer_called_once_with_elapsed_seconds(
+        self, worker_config, fake_docker
+    ):
+        # Regression: sandbox_container_startup_seconds was defined but never observed, so the
+        # SlowContainerStartup alert and dashboard panels could never show data.
+        seen: list[float] = []
+
+        async def reader(_c: str) -> int:
+            return 0
+
+        executor = executor_module.SandboxExecutor(
+            worker_config,
+            spawn=fake_docker.spawn,
+            simple=fake_docker.simple,
+            memory_reader=reader,
+            cpu_reader=reader,
+            startup_observer=seen.append,
+        )
+        fake_docker.configure(stdout=b"x", delay=0.2)
+        await executor.execute(_py(), "jobstart")
+        assert len(seen) == 1
+        assert seen[0] >= 0

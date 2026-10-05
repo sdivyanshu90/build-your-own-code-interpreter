@@ -70,6 +70,10 @@ class FakeProcess:
         self._final = code
         self._killed.set()
 
+    def kill(self) -> None:
+        """Simulate killing the local ``docker run`` client process."""
+        self.force_exit(137)
+
     async def wait(self) -> int:
         if self._returncode is not None:
             return self._returncode
@@ -101,6 +105,8 @@ class FakeDocker:
         self.removed: list[str] = []
         self.killed: list[tuple[str, str]] = []
         self.containers: dict[str, FakeProcess] = {}
+        # When True, `docker kill` is a no-op (models a kill racing container creation).
+        self.ignore_kill = False
 
     @property
     def last_run(self) -> list[str]:
@@ -133,7 +139,7 @@ class FakeDocker:
             name = argv[-1]
             self.killed.append((name, signal))
             proc = self.containers.get(name)
-            if proc is not None and signal in ("KILL", "9", "SIGKILL"):
+            if proc is not None and signal in ("KILL", "9", "SIGKILL") and not self.ignore_kill:
                 proc.force_exit(137)
             return 0, b"", b""
         if sub == "inspect":  # container id resolution

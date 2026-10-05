@@ -22,9 +22,18 @@ class TestShouldReap:
         assert should_reap("Exited (0) 3 seconds ago") is True
         assert should_reap("Exited (137) 1 minute ago") is True
 
-    def test_dead_and_created_are_reaped(self):
+    def test_dead_is_reaped(self):
         assert should_reap("Dead") is True
-        assert should_reap("Created") is True
+
+    def test_fresh_created_container_is_not_reaped(self):
+        # Regression: `Created` is the momentary state of an about-to-start job container; the
+        # reaper must not race the executor and remove it.
+        assert should_reap("Created") is False
+        assert should_reap("Created", "2 seconds ago") is False
+
+    def test_stale_created_container_is_reaped(self):
+        assert should_reap("Created", "10 minutes ago") is True
+        assert should_reap("Created", "About an hour ago") is True
 
     def test_young_running_is_not_reaped(self):
         assert should_reap("Up 3 seconds") is False

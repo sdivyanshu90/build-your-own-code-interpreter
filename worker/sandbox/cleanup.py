@@ -73,7 +73,7 @@ class ContainerReaper:
                 "--filter",
                 "label=sandbox-managed=1",
                 "--format",
-                "{{.ID}}\t{{.Status}}",
+                "{{.ID}}\t{{.Status}}\t{{.RunningFor}}",
                 "--no-trunc",
             ]
         )
@@ -83,8 +83,8 @@ class ContainerReaper:
         for line in out.decode("utf-8", "replace").splitlines():
             if "\t" not in line:
                 continue
-            container_id, status = line.split("\t", 1)
-            if should_reap(status):
+            container_id, status, *rest = line.split("\t")
+            if should_reap(status, rest[0] if rest else ""):
                 await self._simple([self.config.docker_path, "rm", "-f", container_id])
                 reaped += 1
         return reaped
@@ -114,7 +114,12 @@ def _parse_up_age(status: str) -> int | None:
     Handles forms like 'Up 7 seconds', 'Up 6 minutes', 'Up About a minute', 'Up 2 hours'.
     Returns None when the age cannot be determined (in which case the container is left alone).
     """
-    text = status[len("Up ") :].strip().lower()
+    return _parse_relative_age(status[len("Up ") :])
+
+
+def _parse_relative_age(text: str) -> int | None:
+    """Parse a Docker relative duration ('7 seconds', 'About a minute', '5 minutes ago')."""
+    text = text.strip().lower().removesuffix(" ago").strip()
     if text.startswith("less than"):
         return 0
     if text.startswith("about "):
@@ -139,10 +144,18 @@ def _safe_int(value: str) -> int | None:
         return None
 
 
-def should_reap(status: str) -> bool:
-    """Decide whether a container in the given Docker status should be removed."""
+def should_reap(status: str, running_for: str = "") -> bool:
+    """Decide whether a container in the given Docker status should be removed.
+
+    ``running_for`` is Docker's ``{{.RunningFor}}`` (time since creation, e.g. '5 minutes ago').
+    A container in the ``Created`` state is the normal, momentary state of a sandbox that the
+    executor has just issued ``docker run`` for, so it is reaped only once it is clearly stale.
+    """
     stripped = status.strip()
-    if stripped.startswith(("Exited", "Dead", "Created", "Removal")):
+    if stripped.startswith("Created"):
+        age = _parse_relative_age(running_for) if running_for else None
+        return age is not None and age >= ORPHAN_AGE_SECONDS
+    if stripped.startswith(("Exited", "Dead", "Removal")):
         return True
     if stripped.startswith("Up"):
         age = _parse_up_age(stripped)

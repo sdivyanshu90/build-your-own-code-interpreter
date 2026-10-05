@@ -32,7 +32,10 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    # The upstream minio/minio and minio/mc repositories were removed from Docker Hub, so the
+    # previously pinned tags no longer pull. Chainguard's image ships both `minio` and `mc`;
+    # it is pinned by digest — override with MINIO_IMAGE to use another S3-compatible build.
+    image: ${MINIO_IMAGE:-cgr.dev/chainguard/minio:latest@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034}
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
@@ -50,7 +53,7 @@ services:
     restart: unless-stopped
 
   createbuckets:
-    image: minio/mc:RELEASE.2024-11-05T11-29-45Z
+    image: ${MINIO_IMAGE:-cgr.dev/chainguard/minio:latest@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034}
     depends_on:
       minio:
         condition: service_healthy
@@ -95,6 +98,9 @@ services:
       SANDBOX_HOST_WORKDIR: ${SANDBOX_HOST_WORKDIR:-/tmp/code-sandbox-work}
       SANDBOX_IMAGE_TAG: ${SANDBOX_IMAGE_TAG:-latest}
       METRICS_PORT: "9100"
+    # The worker drains in-flight jobs on SIGTERM; give the longest job (25 s ceiling) plus the
+    # up-to-5 s XREADGROUP block time to finish before Docker escalates to SIGKILL (default 10 s).
+    stop_grace_period: 45s
     volumes:
       # Drive sibling sandbox containers via the host daemon.
       - /var/run/docker.sock:/var/run/docker.sock

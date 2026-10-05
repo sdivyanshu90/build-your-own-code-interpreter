@@ -1,0 +1,22 @@
+{
+  "benchmark": "idle_memory",
+  "definition": "docker stats MemUsage (MiB), stack idle, no job run since start-up beyond the health probe",
+  "environment": {
+    "date_utc": "2026-10-04T16:32:59+00:00",
+    "git_sha": "ce4985f",
+    "cpu_model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+    "cpu_count": 8,
+    "mem_total_mb": 5928,
+    "kernel": "6.18.40.1-microsoft-standard-WSL2",
+    "docker_server": "29.4.3",
+    "docker_cgroup": "2 systemd",
+    "python": "3.12.13",
+    "note": "shared WSL2 machine; other workloads may run concurrently (see README caveats)"
+  },
+  "results_mib": {
+    "code-sandbox-api-1": 28.0,
+    "code-sandbox-worker-1": 71.6,
+    "code-sandbox-redis-1": 35.7,
+    "code-sandbox-minio-1": 247.6
+  }
+}
